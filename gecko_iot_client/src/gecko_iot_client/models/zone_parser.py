@@ -1,0 +1,122 @@
+"""
+Zone configuration parser module.
+
+Simple parser for converting zone configurations into zone instances.
+"""
+
+import logging
+from typing import Dict, Any, List
+from .zone_types import AbstractZone, ZoneType, FlowZone, LightingZone, TemperatureControlZone  # This imports all zone types and registers them
+
+
+logger = logging.getLogger(__name__)
+
+
+def _extract_value_from_config(field_value: Any) -> Any:
+    """Extract actual value from config metadata like {'minimum': 0, 'maximum': 100}."""
+    if isinstance(field_value, dict):
+        # Look for actual value keys
+        for key in ['value', 'currentValue', 'default', 'initialValue']:
+            if key in field_value:
+                return field_value[key]
+        # Use minimum as fallback if no value found
+        if 'minimum' in field_value:
+            return field_value['minimum']
+        return None
+    return field_value
+
+
+class ZoneConfigurationParser:
+    """Simple parser for zone configurations."""
+    
+    # Zone type mapping
+    ZONE_TYPES = {
+        "flow": ZoneType.FLOW_ZONE,
+        "lighting": ZoneType.LIGHTING_ZONE,
+        "temperatureControl": ZoneType.TEMPERATURE_CONTROL_ZONE,
+    }
+    
+    ZONE_TYPE_TO_CLASS = {
+        ZoneType.FLOW_ZONE: FlowZone,
+        ZoneType.LIGHTING_ZONE: LightingZone,
+        ZoneType.TEMPERATURE_CONTROL_ZONE: TemperatureControlZone,
+    }
+    
+    def parse_zones_configuration(self, zones_config: Dict[str, Any]) -> Dict[ZoneType, List[AbstractZone]]:
+        """Parse zones configuration into zone instances."""
+        logger.info("Parsing zones configuration")
+        zones: Dict[ZoneType, List[AbstractZone]] = {}
+
+        for zone_type, zone_class in self.ZONE_TYPE_TO_CLASS.items():
+            zone_list = []
+            logger.info(f"Processing zone type: {zone_type}, {zones_config}, {zones_config[zone_type.value]}")
+            for zone_id, zone_config in zones_config.get(zone_type.value, {}).items():
+                try:
+                    zone = zone_class(zone_id, zone_config)
+                    zone_list.append(zone)
+                    logger.debug(f"Created zone {zone_id} of type {zone_type}")
+                except Exception as e:
+                    logger.warning(f"Failed to create zone {zone_id} of type {zone_type}: {e}")
+
+            if zone_list:
+                zones[zone_type] = zone_list
+
+        total_zones = sum(len(zlist) for zlist in zones.values())
+        logger.info(f"Parsed {total_zones} zones successfully")
+        return zones
+    
+    def apply_state_to_zones(self, zones: Dict[ZoneType, List[AbstractZone]], state_data: Dict[str, Any]) -> None:
+        """Apply runtime state data to existing zone instances (not configuration)."""
+        logger.info("Applying runtime state data to zones")
+        
+        # Extract the state from the shadow structure
+        state = state_data.get("state", {})
+        reported_state = state.get("reported", {})
+        desired_state = state.get("desired", {})
+        
+        # Look for zone runtime state data in the reported state first, then desired state
+        zones_state = reported_state.get("zones", {}) if reported_state else {}
+        
+        if not zones_state and desired_state:
+            logger.info("No zones runtime state found in reported state, checking desired state as fallback")
+            zones_state = desired_state.get("zones", {})
+        
+        if not zones_state:
+            logger.info("No zones runtime state found in either reported or desired state data")
+            return
+        
+        logger.info(f"Found zones state data with {len(zones_state)} zone type(s): {list(zones_state.keys())}")
+        
+        updated_count = 0
+        
+        # Apply runtime state to each zone type
+        for zone_type_key, zones_of_type_state in zones_state.items():
+            zone_type = self.ZONE_TYPES.get(zone_type_key)
+            if not zone_type:
+                logger.warning(f"Unknown zone type in state data: {zone_type_key}")
+                continue
+                
+            if zone_type not in zones:
+                logger.warning(f"Zone type {zone_type_key} found in state but no zones of this type exist")
+                continue
+                
+            # Get the zones of this type
+            zone_list = zones[zone_type]
+            logger.info(f"Processing {len(zones_of_type_state)} zone(s) of type {zone_type_key}, have {len(zone_list)} zones configured")
+            
+            # Apply runtime state to each zone
+            for zone_id, zone_runtime_state in zones_of_type_state.items():
+                # Find the zone with this ID
+                zone = next((z for z in zone_list if z.id == zone_id), None)
+                if zone:
+                    try:
+                        # Use the zone's update_from_state method for proper runtime state handling
+                        zone.update_from_state(zone_runtime_state)
+                        logger.debug(f"Updated zone {zone_id} of type {zone_type_key} with state: {zone_runtime_state}")
+                        updated_count += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to update zone {zone_id} from state: {e}")
+                else:
+                    logger.warning(f"Zone {zone_id} of type {zone_type_key} found in state but not in configured zones")
+        
+        logger.info(f"Applied runtime state to {updated_count} zones")

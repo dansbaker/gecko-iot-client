@@ -1,0 +1,42 @@
+[project]
+name = "gecko-iot-client"
+version = "0.1.0"
+description = "A Python client library for Gecko IoT devices with AWS IoT integration"
+authors = [
+    {name = "alex-reid-gecko",email = "areid@geckoal.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "awscrt>=0.19.0",
+    "awsiot>=0.1.0"
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx>=7.0.0",
+    "sphinx-autodoc-typehints>=1.24.0",
+    "sphinx-rtd-theme>=1.3.0",
+    "myst-parser>=2.0.0",
+    "sphinxcontrib-napoleon>=0.7",
+    "sphinx-autobuild>=2024.4.16",
+    "awscrt>=0.19.0",
+    "awsiot>=0.1.0"
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0"
+]
+
+[project.scripts]
+gecko-build-docs = "gecko_iot_client.docs:build_docs"
+
+[tool.poetry]
+packages = [{include = "gecko_iot_client", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
