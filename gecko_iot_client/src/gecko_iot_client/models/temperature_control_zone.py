@@ -38,7 +38,7 @@ class TemperatureControlZone(AbstractZone):
         """Initialize TemperatureControlZone with zone_id and config."""
         # Set default name if not provided
         if 'name' not in config or config['name'] is None:
-            config['name'] = f"Water {zone_id}"
+            config['name'] = f"Water Temperature {zone_id}"
         
         # Extract temperature control specific fields before parent init
         self.min_temperature_set_point_c = config.pop('minTemperatureSetPointC', 
@@ -116,10 +116,21 @@ class TemperatureControlZone(AbstractZone):
         """Set target temperature with validation against configured limits."""
         if self.min_temperature_set_point_c is None or self.max_temperature_set_point_c is None:
             raise ValueError("Temperature limits not configured - cannot validate set point")
-        
+            
         if not (self.min_temperature_set_point_c <= temperature <= self.max_temperature_set_point_c):
             raise ValueError(f"Set point {temperature}°C is outside configured range ({self.min_temperature_set_point_c}°C to {self.max_temperature_set_point_c}°C)")
+        
+        self.set_point = temperature
         self._publish_desired_state({'set_point': temperature})
+
+    def get_temperature_state(self) -> Dict[str, Any]:
+        """Get the current temperature state as a simple dictionary."""
+        return {
+            'current_temperature': self.temperature_,
+            'target_temperature': self.set_point,
+            'status': self.status_.name if self.status_ else None,
+            'eco_mode': self.mode_.eco if self.mode_ else None
+        }
 
     def _get_runtime_state_fields(self) -> set:
         return {'temperature_', 'set_point', 'mode_', 'status_'}

@@ -77,7 +77,7 @@ class TestAbstractZone(unittest.TestCase):
 
     def test_update_from_config(self):
         """Test updating zone from configuration dictionary."""
-        zone = FlowZone(id="flow_1", zone_type=ZoneType.FLOW_ZONE, speed=30.0, active=False)
+        zone = FlowZone("flow_1", {"speed": 30.0, "active": False})
         
         update_config = {
             'speed': 90.0,
@@ -113,21 +113,19 @@ class TestFlowZone(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.flow_zone = FlowZone(
-            id="flow_test", 
-            zone_type=ZoneType.FLOW_ZONE,
-            speed=50.0,
-            active=True
-        )
+        self.flow_zone = FlowZone("flow_test", {
+            "speed": 50.0,
+            "active": True
+        })
 
     def test_default_name_assignment(self):
         """Test that default name is assigned when none provided."""
-        zone = FlowZone(id="2", zone_type=ZoneType.FLOW_ZONE)
+        zone = FlowZone("2", {})
         self.assertEqual(zone.name, "Pump 2")
 
     def test_custom_name_preserved(self):
         """Test that custom name is preserved when provided."""
-        zone = FlowZone(id="1", zone_type=ZoneType.FLOW_ZONE, name="Custom Pump")
+        zone = FlowZone("1", {"name": "Custom Pump"})
         self.assertEqual(zone.name, "Custom Pump")
 
     def test_get_flow_state(self):
@@ -158,19 +156,16 @@ class TestLightingZone(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.lighting_zone = LightingZone(
-            id="light_test", 
-            zone_type=ZoneType.LIGHTING_ZONE
-        )
+        self.lighting_zone = LightingZone("light_test", {})
 
     def test_default_name_assignment(self):
         """Test that default name is assigned when none provided."""
-        zone = LightingZone(id="3", zone_type=ZoneType.LIGHTING_ZONE)
+        zone = LightingZone("3", {})
         self.assertEqual(zone.name, "Light 3")
 
     def test_custom_name_preserved(self):
         """Test that custom name is preserved when provided."""
-        zone = LightingZone(id="1", zone_type=ZoneType.LIGHTING_ZONE, name="RGB Strip")
+        zone = LightingZone("1", {"name": "RGB Strip"})
         self.assertEqual(zone.name, "RGB Strip")
 
     def test_get_lighting_state_empty(self):
@@ -227,25 +222,21 @@ class TestTemperatureControlZone(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.temp_zone = TemperatureControlZone(
-            id="temp_test", 
-            zone_type=ZoneType.TEMPERATURE_CONTROL_ZONE,
-            temperature_=22.5,
-            set_point=24.0
-        )
+        self.temp_zone = TemperatureControlZone("temp_test", {
+            "temperature_": 22.5,
+            "set_point": 24.0,
+            "min_temperature_set_point_c": 20.0,
+            "max_temperature_set_point_c": 40.0
+        })
 
     def test_default_name_assignment(self):
         """Test that default name is assigned when none provided."""
-        zone = TemperatureControlZone(id="1", zone_type=ZoneType.TEMPERATURE_CONTROL_ZONE)
+        zone = TemperatureControlZone("1", {})
         self.assertEqual(zone.name, "Water Temperature 1")
 
     def test_custom_name_preserved(self):
         """Test that custom name is preserved when provided."""
-        zone = TemperatureControlZone(
-            id="1", 
-            zone_type=ZoneType.TEMPERATURE_CONTROL_ZONE, 
-            name="Spa Temperature"
-        )
+        zone = TemperatureControlZone("1", {"name": "Spa Temperature"})
         self.assertEqual(zone.name, "Spa Temperature")
 
     def test_get_temperature_state(self):
@@ -263,6 +254,25 @@ class TestTemperatureControlZone(unittest.TestCase):
         """Test setting target temperature."""
         self.temp_zone.set_target_temperature(26.0)
         self.assertEqual(self.temp_zone.set_point, 26.0)
+
+    def test_set_target_temperature_no_limits_configured(self):
+        """Test that setting target temperature fails when no limits are configured."""
+        zone_without_limits = TemperatureControlZone("test_no_limits", {
+            "temperature_": 22.5,
+            "set_point": 24.0
+        })
+        
+        with self.assertRaises(ValueError) as context:
+            zone_without_limits.set_target_temperature(26.0)
+        
+        self.assertIn("Temperature limits not configured", str(context.exception))
+
+    def test_set_target_temperature_outside_range(self):
+        """Test that setting target temperature fails when outside configured range."""
+        with self.assertRaises(ValueError) as context:
+            self.temp_zone.set_target_temperature(50.0)  # Above max of 40.0
+        
+        self.assertIn("outside configured range", str(context.exception))
 
     def test_eco_mode_new(self):
         """Test eco mode when no mode exists initially."""

@@ -75,6 +75,8 @@ class LightingZone(AbstractZone):
     def set_color(self, r: int, g: int, b: int, i: Optional[int] = None) -> None:
         """Set lighting color."""
         rgb_color = RGB(r=r, g=g, b=b, i=i)
+        self.rgbi = rgb_color
+        self.active = True
         self._publish_desired_state({'rgbi': rgb_color, 'active': True})
     
     def _get_runtime_state_fields(self) -> set:
@@ -118,6 +120,8 @@ class LightingZone(AbstractZone):
     def set_effect(self, effect_name: str) -> None:
         """Set lighting effect with validation."""
         self._validate_effect_name(effect_name)
+        self.effect = effect_name
+        self.active = True
         self._publish_desired_state({'effect': effect_name, 'active': True})
     
     def activate(self) -> None:

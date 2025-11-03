@@ -7,7 +7,7 @@ from unittest.mock import patch
 from typing import Dict, Any
 
 from src.gecko_iot_client.models.zone_parser import (
-    ZoneConfigurationParser, _extract_value_from_config, _process_zone_config
+    ZoneConfigurationParser, _extract_value_from_config
 )
 from src.gecko_iot_client.models.zone_types import ZoneType, FlowZone, LightingZone
 
@@ -45,40 +45,6 @@ class TestZoneParserUtilities(unittest.TestCase):
         """Test returning None when no value can be extracted."""
         config = {'someOtherKey': 'someValue'}
         self.assertIsNone(_extract_value_from_config(config))
-
-    def test_process_zone_config(self):
-        """Test processing zone configuration."""
-        raw_config = {
-            'name': 'Test Zone',
-            'speed': {'value': 50, 'minimum': 0, 'maximum': 100},
-            'active': True,
-            'other_field': {'minimum': 5, 'maximum': 20}
-        }
-        
-        processed = _process_zone_config(raw_config)
-        expected = {
-            'name': 'Test Zone',
-            'speed': 50,
-            'active': True,
-            'other_field': 5  # Falls back to minimum
-        }
-        self.assertEqual(processed, expected)
-
-    def test_process_zone_config_filters_none_values(self):
-        """Test that None values are filtered out during processing."""
-        raw_config = {
-            'name': 'Test Zone',
-            'valid_field': 42,
-            'invalid_field': {'someKey': 'someValue'}  # Will return None
-        }
-        
-        processed = _process_zone_config(raw_config)
-        expected = {
-            'name': 'Test Zone',
-            'valid_field': 42
-            # invalid_field should be filtered out
-        }
-        self.assertEqual(processed, expected)
 
 
 class TestZoneConfigurationParser(unittest.TestCase):

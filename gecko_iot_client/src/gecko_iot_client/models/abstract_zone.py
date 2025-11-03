@@ -81,12 +81,8 @@ class AbstractZone:
         if not zone_class:
             raise ValueError(f"No zone class registered for type {zone_type}")
         
-        # Create instance with id, zone_type, and config data
-        config_copy = config.copy()
-        config_copy['id'] = zone_id
-        config_copy['zone_type'] = zone_type
-        
-        return zone_class(**config_copy)
+        # Create instance with zone_id and config (new signature)
+        return zone_class(zone_id, config)
 
 
     @classmethod
@@ -154,7 +150,46 @@ class AbstractZone:
     def _get_field_mappings(self) -> Dict[str, str]:
         """Get field name mappings (should be overridden by subclasses)."""
         return {}
-   
+
+    def to_config(self) -> Dict[str, Any]:
+        """
+        Serialize zone to configuration dictionary.
+        
+        Returns:
+            Dictionary with zone configuration
+        """
+        config = {
+            'id': self.id,
+            'name': self.name
+        }
+        
+        # Add runtime state fields
+        runtime_fields = self._get_runtime_state_fields()
+        for field in runtime_fields:
+            if hasattr(self, field):
+                config[field] = getattr(self, field)
+                
+        return config
+
+    def to_state_dict(self) -> Dict[str, Any]:
+        """
+        Serialize zone to complete state dictionary.
+        
+        Returns:
+            Dictionary with zone state and metadata
+        """
+        config = {}
+        runtime_fields = self._get_runtime_state_fields()
+        for field in runtime_fields:
+            if hasattr(self, field):
+                config[field] = getattr(self, field)
+        
+        return {
+            'id': self.id,
+            'name': self.name,
+            'zone_type': self.zone_type.value,
+            'config': config
+        }
 
 
 # Example usage and utility functions

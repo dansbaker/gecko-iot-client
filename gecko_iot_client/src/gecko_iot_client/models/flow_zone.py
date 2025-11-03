@@ -31,14 +31,16 @@ class FlowZone(AbstractZone):
         self.speed: Optional[float] = getattr(self, 'speed', None)
         self.initiators_: Optional[List[FlowZoneInitiator]] = getattr(self, 'initiators_', None)
         
-        # Validate speed if present and is a number
-        if self.speed is not None and isinstance(self.speed, (int, float)):
+        # Validate speed if present
+        if self.speed is not None:
+            if not isinstance(self.speed, (int, float)):
+                raise ValueError(f"Flow speed must be a number, got {type(self.speed).__name__}: {self.speed}")
             self._validate_speed(self.speed)
     
     def _validate_speed(self, speed: float) -> None:
         """Validate speed is within acceptable range."""
-        if not (1.0 <= speed <= 100.0):
-            raise ValueError(f"Flow speed {speed}% must be between 1.0 and 100.0")
+        if not (0.0 <= speed <= 100.0):
+            raise ValueError(f"Flow speed {speed}% must be between 0.0 and 100.0")
     
     @property
     def initiators(self) -> Optional[List[FlowZoneInitiator]]:
@@ -71,10 +73,13 @@ class FlowZone(AbstractZone):
             'enabled': 'active',
         }
     
-    def set_speed(self, speed: float) -> None:
-        """Set flow speed with validation."""
+    def set_speed(self, speed: float, active: Optional[bool] = True) -> None:
+        """Set flow speed with validation and optional active state."""
         self._validate_speed(speed)
-        self._publish_desired_state({'speed': speed})
+        self.speed = speed
+        if active is not None:
+            self.active = active
+        self._publish_desired_state({'speed': speed, 'active': self.active})
 
     def activate(self) -> None:
         """Activate this zone."""

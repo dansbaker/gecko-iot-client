@@ -47,12 +47,30 @@ class ZoneConfigurationParser:
         logger.info("Parsing zones configuration")
         zones: Dict[ZoneType, List[AbstractZone]] = {}
 
+        # Check for unknown zone types first
+        for zone_type_key in zones_config.keys():
+            if zone_type_key not in self.ZONE_TYPES:
+                logger.warning(f"Unknown zone type: {zone_type_key}")
+
         for zone_type, zone_class in self.ZONE_TYPE_TO_CLASS.items():
             zone_list = []
-            logger.info(f"Processing zone type: {zone_type}, {zones_config}, {zones_config[zone_type.value]}")
-            for zone_id, zone_config in zones_config.get(zone_type.value, {}).items():
+            zone_type_config = zones_config.get(zone_type.value, {})
+            logger.info(f"Processing zone type: {zone_type}, found {len(zone_type_config)} zones")
+            for zone_id, zone_config in zone_type_config.items():
+                # Skip zones with empty IDs
+                if not zone_id or zone_id.strip() == '':
+                    logger.warning(f"Skipping zone with empty ID in {zone_type.value}")
+                    continue
+                    
                 try:
-                    zone = zone_class(zone_id, zone_config)
+                    # Process config values to extract actual values from metadata
+                    processed_config = {}
+                    for key, value in zone_config.items():
+                        processed_value = _extract_value_from_config(value)
+                        if processed_value is not None:  # Only include non-None values
+                            processed_config[key] = processed_value
+                    
+                    zone = zone_class(zone_id, processed_config)
                     zone_list.append(zone)
                     logger.debug(f"Created zone {zone_id} of type {zone_type}")
                 except Exception as e:
