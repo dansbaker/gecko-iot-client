@@ -58,11 +58,11 @@ jobs:
         ls -la gecko_iot_client/docs/build/html/
     
     - name: Setup Pages
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
       uses: actions/configure-pages@v4
     
     - name: Upload to GitHub Pages
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
       uses: actions/upload-pages-artifact@v3
       with:
         path: gecko_iot_client/docs/build/html/
@@ -76,7 +76,7 @@ jobs:
         retention-days: 7
 
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     needs: build-docs
     runs-on: ubuntu-latest
     
