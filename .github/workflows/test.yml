@@ -15,6 +15,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for better analysis
     
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -30,14 +32,13 @@ jobs:
     - name: Run tests
       run: |
         cd gecko_iot_client
-        pytest tests/ --cov=gecko_iot_client --cov-report=xml
+        pytest tests/ --cov=gecko_iot_client --cov-report=xml --cov-report=lcov --junitxml=test-results.xml
     
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./gecko_iot_client/coverage.xml
-        fail_ci_if_error: true
-        token: ${{ secrets.CODECOV_TOKEN }}
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     
     - name: Check code style
       run: |

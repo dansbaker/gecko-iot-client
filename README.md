@@ -4,7 +4,8 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Tests](https://github.com/geckoal/gecko-iot-client/workflows/Tests/badge.svg)](https://github.com/geckoal/gecko-iot-client/actions/workflows/test.yml)
 [![Documentation](https://github.com/geckoal/gecko-iot-client/workflows/Documentation/badge.svg)](https://github.com/geckoal/gecko-iot-client/actions/workflows/docs.yml)
-[![Code Coverage](https://codecov.io/gh/geckoal/gecko-iot-client/branch/main/graph/badge.svg)](https://codecov.io/gh/geckoal/gecko-iot-client)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=geckoal_gecko-iot-client&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=geckoal_gecko-iot-client)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=geckoal_gecko-iot-client&metric=coverage)](https://sonarcloud.io/summary/new_code?id=geckoal_gecko-iot-client)
 [![PyPI Version](https://img.shields.io/pypi/v/gecko-iot-client.svg)](https://pypi.org/project/gecko-iot-client/)
 
 A modern, asynchronous Python client library for Gecko IoT devices with AWS IoT integration. Control and monitor your Gecko-powered spas, hot tubs, and pool equipment with ease.
@@ -84,7 +85,7 @@ client.register_zone_callbacks(lambda zone_name: on_temperature_change)
 
 ## 📁 Project Structure
 
-```
+```text
 gecko-iot-client/
 ├── .github/workflows/     # CI/CD pipelines
 ├── gecko_iot_client/      # Main package
@@ -96,6 +97,7 @@ gecko-iot-client/
 │   ├── docs/             # Sphinx documentation
 │   └── examples/         # Usage examples
 └── README.md             # This file
+```
 
 ## 🛠️ Development
 
@@ -158,8 +160,8 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ## 📊 Testing & Quality
 
 - **✅ Automated Testing**: GitHub Actions run tests on every push and PR
-- **📈 Code Coverage**: Monitored via Codecov with detailed reports
-- **🔍 Code Quality**: Black, isort, and flake8 ensure consistent style
+- **📈 Code Coverage**: Monitored via SonarCloud with detailed quality reports
+- **🔍 Code Quality**: SonarCloud analysis with Black, isort, and flake8 for consistent style
 - **📝 Documentation**: Auto-generated and deployed on every release
 
 ## 📄 License
