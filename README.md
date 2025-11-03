@@ -4,8 +4,8 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Tests](https://github.com/geckoal/gecko-iot-client/workflows/Tests/badge.svg)](https://github.com/geckoal/gecko-iot-client/actions/workflows/test.yml)
 [![Documentation](https://github.com/geckoal/gecko-iot-client/workflows/Documentation/badge.svg)](https://github.com/geckoal/gecko-iot-client/actions/workflows/docs.yml)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=geckoal_gecko-iot-client&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=geckoal_gecko-iot-client)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=geckoal_gecko-iot-client&metric=coverage)](https://sonarcloud.io/summary/new_code?id=geckoal_gecko-iot-client)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=geckoal_gecko-iot-client&metric=alert_status&token=c5bedb67924350524a1220f96df80222cbe64108)](https://sonarcloud.io/summary/new_code?id=geckoal_gecko-iot-client)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=geckoal_gecko-iot-client&metric=coverage&token=c5bedb67924350524a1220f96df80222cbe64108)](https://sonarcloud.io/summary/new_code?id=geckoal_gecko-iot-client)
 [![PyPI Version](https://img.shields.io/pypi/v/gecko-iot-client.svg)](https://pypi.org/project/gecko-iot-client/)
 
 A modern, asynchronous Python client library for Gecko IoT devices with AWS IoT integration. Control and monitor your Gecko-powered spas, hot tubs, and pool equipment with ease.
