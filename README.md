@@ -1,5 +1,15 @@
 # 🦎 Gecko IoT Client
 
+> [!CAUTION]
+> **🚨 HEAVY DEVELOPMENT IN PROGRESS 🚨**
+>
+> This project is under **heavy active development** and the API is **rapidly changing**.
+>
+> - ⚠️ **Breaking changes expected** in the coming days/weeks
+> - 🚫 **Not recommended for production use** until v1.0.0
+> - 🎯 **Use at your own risk** for development/testing only
+> - 📅 **API stability target**: Within November 2025
+
 [![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Tests](https://github.com/geckoal/gecko-iot-client/workflows/Tests/badge.svg)](https://github.com/geckoal/gecko-iot-client/actions/workflows/test.yml)
