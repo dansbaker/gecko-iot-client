@@ -188,6 +188,79 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **🐛 Issues**: [GitHub Issues](https://github.com/geckoal/gecko-iot-client/issues)
 - **💬 Discussions**: [GitHub Discussions](https://github.com/geckoal/gecko-iot-client/discussions)
 
+## 🏷️ Versioning Strategy
+
+This project follows [Semantic Versioning (SemVer)](https://semver.org/) combined with [PEP 440](https://peps.python.org/pep-0440/) for Python compatibility.
+
+### Version Format
+
+```text
+MAJOR.MINOR.PATCH[-PRERELEASE]
+```
+
+- **MAJOR**: Breaking changes (incompatible API changes)
+- **MINOR**: New features (backward-compatible functionality)
+- **PATCH**: Bug fixes (backward-compatible fixes)
+
+### Git Tag Format
+
+All releases use the `v` prefix in git tags:
+
+```bash
+# Release versions
+v1.0.0          # Major release
+v1.1.0          # Minor release  
+v1.1.1          # Patch release
+
+# Pre-release versions
+v1.0.0-alpha.1  # Alpha release
+v1.0.0-beta.1   # Beta release
+v1.0.0-rc.1     # Release candidate
+```
+
+### Release Lifecycle
+
+| Stage | Git Tag Example | PyPI Version | Purpose |
+|-------|----------------|--------------|---------|
+| **Alpha** | `v0.1.0-alpha.1` | `0.1.0a1` | Early development, internal testing |
+| **Beta** | `v0.1.0-beta.1` | `0.1.0b1` | Feature complete, external testing |
+| **Release Candidate** | `v0.1.0-rc.1` | `0.1.0rc1` | Final validation before release |
+| **Stable Release** | `v0.1.0` | `0.1.0` | Production ready |
+| **Patch Release** | `v0.1.1` | `0.1.1` | Bug fixes only |
+| **Minor Release** | `v0.2.0` | `0.2.0` | New features, backward compatible |
+| **Major Release** | `v1.0.0` | `1.0.0` | Breaking changes |
+
+### Current Development Phase
+
+🚧 **Alpha Stage** - The project is currently in alpha development:
+
+- **API Stability**: ⚠️ APIs may change without notice
+- **Production Use**: ❌ Not recommended until v1.0.0
+- **Testing**: ✅ Suitable for development and testing
+- **Feedback**: 🎯 Highly appreciated via GitHub Issues
+
+### Version Detection
+
+Versions are automatically determined from git tags using `setuptools-scm`:
+
+```python
+import gecko_iot_client
+print(gecko_iot_client.__version__)  # e.g., "0.1.0a2.post1"
+```
+
+**Version Components:**
+
+- `0.1.0a2` - Alpha version 2 of release 0.1.0
+- `.post1` - 1 commit after the tagged release
+- `+dirty` - Local uncommitted changes (development builds)
+
+### Release Process
+
+1. **Development** happens on the `develop` branch
+2. **Tagging** creates releases: `git tag v0.1.0-alpha.3 && git push origin v0.1.0-alpha.3`
+3. **GitHub Actions** automatically builds and publishes to PyPI
+4. **Documentation** is automatically updated and deployed
+
 ## 🏷️ Version History
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed version history.
