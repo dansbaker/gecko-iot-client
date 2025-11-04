@@ -1,7 +1,6 @@
 """Operation mode controller for Gecko IoT devices - handles read/write operations."""
 
 import logging
-from enum import Enum
 from typing import Any, Callable, Dict, Optional
 
 from .operation_mode import OperationMode

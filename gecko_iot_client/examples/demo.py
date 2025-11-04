@@ -8,18 +8,17 @@ import os
 import sys
 import time
 
+# Add the src directory to the Python path so we can import our package
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from gecko_iot_client import GeckoIotClient  # noqa: E402
+from gecko_iot_client.models.abstract_zone import ZoneType  # noqa: E402
+from gecko_iot_client.transporters.mqtt import MqttTransporter  # noqa: E402
+
 # Setup logging to see what's happening
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-
-# Add the src directory to the Python path so we can import our package
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-
-from gecko_iot_client import GeckoIotClient
-from gecko_iot_client.models.abstract_zone import ZoneType
-from gecko_iot_client.models.lighting_zone import LightingZone
-from gecko_iot_client.transporters.mqtt import MqttTransporter
 
 
 def create_zone_change_logger(zone_name: str):
@@ -57,7 +56,8 @@ def on_zones_updated(zones_dict):
                     print(f"     Light State: Active={state['active']}, No Color Set")
             elif zone_type == ZoneType.TEMPERATURE_CONTROL_ZONE:
                 print(
-                    f"     Temp State: Current={zone.temperature}°C, Target={zone.target_temperature}°C, Status={zone.status}"
+                    f"     Temp State: Current={zone.temperature}°C, "
+                    f"Target={zone.target_temperature}°C, Status={zone.status}"
                 )
     print("=" * 50)
 
@@ -65,10 +65,12 @@ def on_zones_updated(zones_dict):
 def main():
     """Main demo function"""
     print("Creating MQTT transporter...")
-    transporter = MqttTransporter(
-        "wss://a28a28s8rcruem-ats.iot.us-east-1.amazonaws.com/mqtt?x-amz-customauthorizer-name=ThirdPartyMqttCustomAuthorizer&token=111111119&x-amz-customauthorizer-signature=2222222",
-        "24002a002",
+    websocket_url = (
+        "wss://a28a28s8rcruem-ats.iot.us-east-1.amazonaws.com/mqtt"
+        "?x-amz-customauthorizer-name=ThirdPartyMqttCustomAuthorizer"
+        "&token=111111119&x-amz-customauthorizer-signature=2222222"
     )
+    transporter = MqttTransporter(websocket_url, "24002a002")
 
     print("Creating GeckoIotClient...")
     client = GeckoIotClient(idd="24002a002", transporter=transporter)

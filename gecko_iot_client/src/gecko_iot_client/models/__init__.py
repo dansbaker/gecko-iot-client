@@ -4,7 +4,17 @@ from .connectivity import ConnectivityStatus
 from .events import EventChannel, EventEmitter
 from .operation_mode import OperationMode, OperationModeStatus
 from .zone_parser import ZoneConfigurationParser
-from .zone_types import *  # This imports all zone types and registers them
+from .zone_types import (
+    AbstractZone,
+    ZoneType,
+    TemperatureControlZone,
+    TemperatureControlZoneStatus,
+    TemperatureControlMode,
+    FlowZone,
+    FlowZoneInitiator,
+    LightingZone,
+    RGB,
+)
 
 __all__ = [
     "AbstractZone",

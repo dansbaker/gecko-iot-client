@@ -150,7 +150,8 @@ class TemperatureControlZone(AbstractZone):
             <= self.max_temperature_set_point_c
         ):
             raise ValueError(
-                f"Set point {temperature}°C is outside configured range ({self.min_temperature_set_point_c}°C to {self.max_temperature_set_point_c}°C)"
+                f"Set point {temperature}°C is outside configured range "
+                f"({self.min_temperature_set_point_c}°C to {self.max_temperature_set_point_c}°C)"
             )
 
         self.set_point = temperature
@@ -215,7 +216,8 @@ class TemperatureControlZone(AbstractZone):
 
         except (ValueError, KeyError) as e:
             print(
-                f"Warning: Could not convert status value {status_value} (type: {type(status_value)}) to TemperatureControlZoneStatus: {e}"
+                f"Warning: Could not convert status value {status_value} (type: {type(status_value)}) "
+                f"to TemperatureControlZoneStatus: {e}"
             )
 
         return None

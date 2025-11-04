@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List
 
 from .models.connectivity import ConnectivityStatus
 from .models.events import EventChannel, EventEmitter
@@ -95,12 +95,16 @@ class GeckoIotClient:
             {
                 "status_obj": self._connectivity_status,
                 "event_channel": EventChannel.CONNECTIVITY_UPDATE,
-                "log_formatter": lambda status: f"Device connectivity changed: gateway={status.gateway_status}, vessel={status.vessel_status}",
+                "log_formatter": lambda status: (
+                    f"Device connectivity changed: gateway={status.gateway_status}, vessel={status.vessel_status}"
+                ),
             },
             {
                 "status_obj": self._operation_mode_controller,
                 "event_channel": EventChannel.OPERATION_MODE_UPDATE,
-                "log_formatter": lambda controller: f"Operation mode changed to: {controller.mode_name} ({controller.operation_mode.value})",
+                "log_formatter": lambda controller: (
+                    f"Operation mode changed to: {controller.mode_name} ({controller.operation_mode.value})"
+                ),
             },
         ]
 

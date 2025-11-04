@@ -3,7 +3,6 @@ Unit tests for zone configuration parser.
 """
 
 import unittest
-from typing import Any, Dict
 from unittest.mock import patch
 
 from src.gecko_iot_client.models.zone_parser import (

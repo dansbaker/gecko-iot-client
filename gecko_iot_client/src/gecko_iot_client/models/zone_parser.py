@@ -143,7 +143,8 @@ class ZoneConfigurationParser:
             # Get the zones of this type
             zone_list = zones[zone_type]
             logger.info(
-                f"Processing {len(zones_of_type_state)} zone(s) of type {zone_type_key}, have {len(zone_list)} zones configured"
+                f"Processing {len(zones_of_type_state)} zone(s) of type {zone_type_key}, "
+                f"have {len(zone_list)} zones configured"
             )
 
             # Apply runtime state to each zone

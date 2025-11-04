@@ -3,7 +3,6 @@ Unit tests for OperationMode functionality.
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
 
 from src.gecko_iot_client.models.events import EventChannel, EventEmitter
 from src.gecko_iot_client.models.operation_mode import (

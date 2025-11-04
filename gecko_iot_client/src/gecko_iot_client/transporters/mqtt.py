@@ -12,7 +12,7 @@ import threading
 import time
 import urllib.parse
 from concurrent.futures import Future
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Callable, Dict, Optional
 
 from awscrt import mqtt5

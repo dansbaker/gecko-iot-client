@@ -2,10 +2,8 @@
 Token manager for handling AWS IoT token refresh and expiration.
 """
 
-import asyncio
 import logging
 import threading
-import time
 from datetime import datetime, timedelta
 from typing import Callable, Optional
 

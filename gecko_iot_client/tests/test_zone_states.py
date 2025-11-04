@@ -3,7 +3,6 @@ Unit tests for zone states and serialization functionality.
 """
 
 import unittest
-from typing import Any, Dict
 
 from src.gecko_iot_client.models.zone_types import (
     RGB,
