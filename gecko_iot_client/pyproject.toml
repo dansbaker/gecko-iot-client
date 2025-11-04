@@ -1,6 +1,6 @@
 [project]
 name = "gecko-iot-client"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A Python client library for Gecko IoT devices with AWS IoT integration"
 authors = [
     {name = "alex-reid-gecko", email = "areid@geckoal.com"}
@@ -46,7 +46,8 @@ dev = [
     "black>=23.0.0",
     "isort>=5.12.0",
     "flake8>=6.0.0",
-    "auto-changelog>=0.6.0"
+    "auto-changelog>=0.6.0",
+    "setuptools-scm>=8.0"
 ]
 
 [project.scripts]
@@ -54,8 +55,15 @@ gecko-build-docs = "gecko_iot_client.docs:build_docs"
 gecko-build-changelog = "gecko_iot_client.changelog:build_changelog"
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm>=8.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+# Use git tags for versioning
+root = ".."
+version_scheme = "post-release"
+local_scheme = "dirty-tag"
+fallback_version = "0.1.0.dev0"
 
 [tool.setuptools.packages.find]
 where = ["src"]

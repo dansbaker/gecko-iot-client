@@ -34,7 +34,13 @@ __all__ = [
     "OperationModeController",
 ]
 
-__version__ = "0.1.0"
+# Get version from setuptools-scm
+try:
+    from importlib.metadata import version
+    __version__ = version("gecko-iot-client")
+except Exception:
+    # Fallback for development/testing
+    __version__ = "0.0.0.dev0"
 
 
 class GeckoIotClient:
