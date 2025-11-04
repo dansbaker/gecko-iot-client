@@ -1,0 +1,8 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include RELEASE.md
+recursive-include src/gecko_iot_client *.py
+recursive-include src/gecko_iot_client *.typed
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

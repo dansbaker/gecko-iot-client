@@ -11,7 +11,7 @@
 > - 📅 **API stability target**: Within November 2025
 
 [![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://python.org)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Tests](https://github.com/geckoal/gecko-iot-client/workflows/Tests/badge.svg)](https://github.com/geckoal/gecko-iot-client/actions/workflows/test.yml)
 [![Documentation](https://github.com/geckoal/gecko-iot-client/workflows/Documentation/badge.svg)](https://github.com/geckoal/gecko-iot-client/actions/workflows/docs.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=geckoal_gecko-iot-client&metric=alert_status&token=c5bedb67924350524a1220f96df80222cbe64108)](https://sonarcloud.io/summary/new_code?id=geckoal_gecko-iot-client)

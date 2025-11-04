@@ -1,0 +1,117 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+    # Only run if the release is created from the develop branch
+  push:
+    branches: [develop]
+    tags:
+      - 'v*'
+
+# Set permissions for the GITHUB_TOKEN
+permissions:
+  contents: read
+  id-token: write  # Required for OIDC authentication with PyPI
+
+jobs:
+  build:
+    name: Build distribution 📦
+    runs-on: ubuntu-latest
+    # Only run on releases from develop branch or version tags
+    if: (github.event_name == 'release' && github.event.release.target_commitish == 'develop') || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+        cache: 'pip'
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install build
+
+    - name: Build package
+      run: |
+        cd gecko_iot_client
+        python -m build
+
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: gecko_iot_client/dist/
+
+  test-build:
+    name: Test the built package 🧪
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: (github.event_name == 'release' && github.event.release.target_commitish == 'develop') || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+
+    - name: Test installation from wheel
+      run: |
+        python -m pip install --upgrade pip
+        # Install the built package
+        python -m pip install dist/*.whl
+        # Test basic import
+        python -c "import gecko_iot_client; print('Package import successful')"
+
+  publish-to-pypi:
+    name: Publish to PyPI 🚀
+    runs-on: ubuntu-latest
+    needs: [build, test-build]
+    # Only publish on actual releases from develop branch, not on every push to develop
+    if: github.event_name == 'release' && github.event.release.target_commitish == 'develop'
+
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+
+    - name: Publish distribution 📦 to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
+        packages-dir: dist/
+
+  publish-to-testpypi:
+    name: Publish to TestPyPI 🧪
+    runs-on: ubuntu-latest
+    needs: [build, test-build]
+    # Publish to TestPyPI on version tags from develop branch (for testing)
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'main'
+
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+
+    - name: Publish distribution 📦 to TestPyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        repository-url: https://test.pypi.org/legacy/
+        packages-dir: dist/
