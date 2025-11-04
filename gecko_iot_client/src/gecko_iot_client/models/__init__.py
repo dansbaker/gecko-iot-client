@@ -5,15 +5,15 @@ from .events import EventChannel, EventEmitter
 from .operation_mode import OperationMode, OperationModeStatus
 from .zone_parser import ZoneConfigurationParser
 from .zone_types import (
+    RGB,
     AbstractZone,
-    ZoneType,
-    TemperatureControlZone,
-    TemperatureControlZoneStatus,
-    TemperatureControlMode,
     FlowZone,
     FlowZoneInitiator,
     LightingZone,
-    RGB,
+    TemperatureControlMode,
+    TemperatureControlZone,
+    TemperatureControlZoneStatus,
+    ZoneType,
 )
 
 __all__ = [
