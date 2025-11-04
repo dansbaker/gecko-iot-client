@@ -37,6 +37,7 @@ __all__ = [
 # Get version from setuptools-scm
 try:
     from importlib.metadata import version
+
     __version__ = version("gecko-iot-client")
 except Exception:
     # Fallback for development/testing
