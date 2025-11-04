@@ -1,6 +1,6 @@
-from enum import Enum
-from typing import List, Optional, Callable, Dict, Any, Type
 import weakref
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Type
 
 
 class ZoneType(Enum):
@@ -11,24 +11,28 @@ class ZoneType(Enum):
 
 class AbstractZone:
     """Base zone class with change callback functionality"""
-    
+
     # Callback function for publishing desired state updates
     _publish_callback: Optional[Callable[[str, str, Dict[str, Any]], None]] = None
-    
-    def __init__(self, id: str, zone_type: ZoneType, name: Optional[str] = None, **kwargs):
+
+    def __init__(
+        self, id: str, zone_type: ZoneType, name: Optional[str] = None, **kwargs
+    ):
         """Initialize zone with required fields."""
         self.id = id
         self.name = name
         self.zone_type = zone_type
         # Set any additional attributes from kwargs
         for key, value in kwargs.items():
-            if not key.startswith('_'):
+            if not key.startswith("_"):
                 setattr(self, key, value)
-    
-    def set_publish_callback(self, callback: Callable[[str, str, Dict[str, Any]], None]) -> None:
+
+    def set_publish_callback(
+        self, callback: Callable[[str, str, Dict[str, Any]], None]
+    ) -> None:
         """
         Set the callback function for publishing desired state updates.
-        
+
         Args:
             callback: Function that takes (zone_type, zone_id, updates) and handles publishing
         """
@@ -43,36 +47,42 @@ class AbstractZone:
             except Exception as e:
                 print(f"Failed to publish desired state for zone {self.id}: {e}")
         else:
-            print(f"No publish callback set for zone {self.id} - cannot publish desired state")
+            print(
+                f"No publish callback set for zone {self.id} - cannot publish desired state"
+            )
 
     # Class registry for zone types
     @classmethod
     def _get_zone_registry(cls):
         """Get the zone registry, creating it if it doesn't exist"""
-        if not hasattr(cls, '_registry'):
+        if not hasattr(cls, "_registry"):
             cls._registry = {}
         return cls._registry
 
     @classmethod
     def register_zone_type(cls, zone_type: ZoneType):
         """Decorator to register a zone class with its type"""
+
         def decorator(zone_class):
             registry = cls._get_zone_registry()
             registry[zone_type] = zone_class
             zone_class.ZONE_TYPE = zone_type
             return zone_class
+
         return decorator
 
     @classmethod
-    def from_config(cls, zone_id: str, config: Dict[str, Any], zone_type: ZoneType) -> 'AbstractZone':
+    def from_config(
+        cls, zone_id: str, config: Dict[str, Any], zone_type: ZoneType
+    ) -> "AbstractZone":
         """
         Create a zone instance from configuration data.
-        
+
         Args:
             zone_id: Unique identifier for the zone
             config: Configuration dictionary
             zone_type: Type of zone to create
-            
+
         Returns:
             An instance of the appropriate zone class
         """
@@ -80,73 +90,72 @@ class AbstractZone:
         zone_class = registry.get(zone_type)
         if not zone_class:
             raise ValueError(f"No zone class registered for type {zone_type}")
-        
+
         # Create instance with zone_id and config (new signature)
         return zone_class(zone_id, config)
 
-
     @classmethod
-    def from_state_dict(cls, state_dict: Dict[str, Any]) -> 'AbstractZone':
+    def from_state_dict(cls, state_dict: Dict[str, Any]) -> "AbstractZone":
         """
         Deserialize a zone from a complete state dictionary.
-        
+
         Args:
             state_dict: Dictionary with zone state and metadata
-            
+
         Returns:
             An instance of the appropriate zone class
         """
-        zone_type_str = state_dict.get('zone_type')
+        zone_type_str = state_dict.get("zone_type")
         if not zone_type_str:
             raise ValueError("Missing zone_type in state dictionary")
-        
+
         # Convert string back to enum
         zone_type = ZoneType(zone_type_str)
-        zone_id = state_dict.get('id')
+        zone_id = state_dict.get("id")
         if not zone_id:
             raise ValueError("Missing zone id in state dictionary")
-        zone_config = state_dict.get('config', {})
-        
+        zone_config = state_dict.get("config", {})
+
         # Add name from state if present
-        if 'name' in state_dict:
-            zone_config['name'] = state_dict['name']
-        
+        if "name" in state_dict:
+            zone_config["name"] = state_dict["name"]
+
         return cls.from_config(zone_id, zone_config, zone_type)
-    
+
     def update_from_config(self, config: Dict[str, Any]) -> None:
         """
         Update zone from configuration data (structure, limits, capabilities).
-        
+
         Args:
             config: Configuration dictionary with zone setup values
         """
         for field_name, field_value in config.items():
-            if hasattr(self, field_name) and not field_name.startswith('_'):
+            if hasattr(self, field_name) and not field_name.startswith("_"):
                 # Skip zone_type and id as they shouldn't change
-                if field_name not in ['zone_type', 'id']:
+                if field_name not in ["zone_type", "id"]:
                     setattr(self, field_name, field_value)
 
     def update_from_state(self, state: Dict[str, Any]) -> None:
         """
         Update zone from runtime state data.
-        
+
         Args:
             state: State dictionary with current values
         """
         # Apply field mappings if available
-        field_mappings = getattr(self, '_get_field_mappings', lambda: {})()
-        
+        field_mappings = getattr(self, "_get_field_mappings", lambda: {})()
+
         for field_name, field_value in state.items():
             # Check if there's a mapping for this field
             mapped_field = field_mappings.get(field_name, field_name)
-            
-            if hasattr(self, mapped_field) and not mapped_field.startswith('_'):
+
+            if hasattr(self, mapped_field) and not mapped_field.startswith("_"):
                 setattr(self, mapped_field, field_value)
 
     def _get_runtime_state_fields(self) -> set:
         """Get the set of fields that represent runtime state (should be overridden by subclasses)."""
         return set()
-    
+
     def _get_field_mappings(self) -> Dict[str, str]:
         """Get field name mappings (should be overridden by subclasses)."""
         return {}
@@ -154,27 +163,24 @@ class AbstractZone:
     def to_config(self) -> Dict[str, Any]:
         """
         Serialize zone to configuration dictionary.
-        
+
         Returns:
             Dictionary with zone configuration
         """
-        config = {
-            'id': self.id,
-            'name': self.name
-        }
-        
+        config = {"id": self.id, "name": self.name}
+
         # Add runtime state fields
         runtime_fields = self._get_runtime_state_fields()
         for field in runtime_fields:
             if hasattr(self, field):
                 config[field] = getattr(self, field)
-                
+
         return config
 
     def to_state_dict(self) -> Dict[str, Any]:
         """
         Serialize zone to complete state dictionary.
-        
+
         Returns:
             Dictionary with zone state and metadata
         """
@@ -183,28 +189,35 @@ class AbstractZone:
         for field in runtime_fields:
             if hasattr(self, field):
                 config[field] = getattr(self, field)
-        
+
         return {
-            'id': self.id,
-            'name': self.name,
-            'zone_type': self.zone_type.value,
-            'config': config
+            "id": self.id,
+            "name": self.name,
+            "zone_type": self.zone_type.value,
+            "config": config,
         }
 
 
 # Example usage and utility functions
 def create_zone_logger(zone_name: str) -> Callable[[str, Any, Any], None]:
     """Create a logging callback for zone changes"""
+
     def log_change(attribute: str, old_value: Any, new_value: Any) -> None:
         print(f"[{zone_name}] {attribute} changed: {old_value} -> {new_value}")
+
     return log_change
 
 
-def create_validation_callback(attribute: str, validator: Callable[[Any], bool], 
-                             error_message: str = "Invalid value") -> Callable[[str, Any, Any], None]:
+def create_validation_callback(
+    attribute: str,
+    validator: Callable[[Any], bool],
+    error_message: str = "Invalid value",
+) -> Callable[[str, Any, Any], None]:
     """Create a validation callback for specific attributes"""
+
     def validate_change(attr: str, old_value: Any, new_value: Any) -> None:
         if attr == attribute and new_value is not None:
             if not validator(new_value):
                 print(f"Warning: {error_message} for {attr}: {new_value}")
+
     return validate_change

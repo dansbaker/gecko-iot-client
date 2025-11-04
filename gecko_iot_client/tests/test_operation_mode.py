@@ -5,8 +5,11 @@ Unit tests for OperationMode functionality.
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.gecko_iot_client.models.operation_mode import OperationMode, OperationModeStatus
 from src.gecko_iot_client.models.events import EventChannel, EventEmitter
+from src.gecko_iot_client.models.operation_mode import (
+    OperationMode,
+    OperationModeStatus,
+)
 
 
 class TestOperationMode(unittest.TestCase):
@@ -38,7 +41,9 @@ class TestOperationMode(unittest.TestCase):
 
     def test_operation_mode_from_value_existing_enum(self):
         """Test that passing an existing OperationMode returns the same value."""
-        self.assertEqual(OperationMode.from_value(OperationMode.STANDARD), OperationMode.STANDARD)
+        self.assertEqual(
+            OperationMode.from_value(OperationMode.STANDARD), OperationMode.STANDARD
+        )
 
     def test_operation_mode_from_value_invalid(self):
         """Test that invalid values default to OTHER."""
@@ -71,7 +76,7 @@ class TestOperationModeStatus(unittest.TestCase):
             (OperationMode.WEEKENDER, "Weekender"),
             (OperationMode.OTHER, "Other"),
         ]
-        
+
         for mode, expected_name in test_cases:
             with self.subTest(mode=mode):
                 status = OperationModeStatus(mode)
@@ -80,14 +85,22 @@ class TestOperationModeStatus(unittest.TestCase):
     def test_is_energy_saving_property(self):
         """Test is_energy_saving property logic."""
         # Energy saving modes
-        energy_saving_modes = [OperationMode.AWAY, OperationMode.SAVINGS, OperationMode.SUPER_SAVINGS]
+        energy_saving_modes = [
+            OperationMode.AWAY,
+            OperationMode.SAVINGS,
+            OperationMode.SUPER_SAVINGS,
+        ]
         for mode in energy_saving_modes:
             with self.subTest(mode=mode):
                 status = OperationModeStatus(mode)
                 self.assertTrue(status.is_energy_saving)
 
         # Non-energy saving modes
-        non_energy_saving_modes = [OperationMode.STANDARD, OperationMode.WEEKENDER, OperationMode.OTHER]
+        non_energy_saving_modes = [
+            OperationMode.STANDARD,
+            OperationMode.WEEKENDER,
+            OperationMode.OTHER,
+        ]
         for mode in non_energy_saving_modes:
             with self.subTest(mode=mode):
                 status = OperationModeStatus(mode)
@@ -95,40 +108,22 @@ class TestOperationModeStatus(unittest.TestCase):
 
     def test_from_state_data_valid(self):
         """Test creating OperationModeStatus from valid state data."""
-        state_data = {
-            "state": {
-                "reported": {
-                    "features": {
-                        "operationMode": 1
-                    }
-                }
-            }
-        }
-        
+        state_data = {"state": {"reported": {"features": {"operationMode": 1}}}}
+
         status = OperationModeStatus.from_state_data(state_data)
         self.assertEqual(status.operation_mode, OperationMode.STANDARD)
 
     def test_from_state_data_missing_features(self):
         """Test creating OperationModeStatus from state data missing features."""
-        state_data = {
-            "state": {
-                "reported": {}
-            }
-        }
-        
+        state_data = {"state": {"reported": {}}}
+
         status = OperationModeStatus.from_state_data(state_data)
         self.assertEqual(status.operation_mode, OperationMode.OTHER)
 
     def test_from_state_data_missing_operation_mode(self):
         """Test creating OperationModeStatus from state data missing operationMode."""
-        state_data = {
-            "state": {
-                "reported": {
-                    "features": {}
-                }
-            }
-        }
-        
+        state_data = {"state": {"reported": {"features": {}}}}
+
         status = OperationModeStatus.from_state_data(state_data)
         self.assertEqual(status.operation_mode, OperationMode.OTHER)
 
@@ -140,7 +135,7 @@ class TestOperationModeStatus(unittest.TestCase):
             {"state": {"reported": None}},
             None,
         ]
-        
+
         for invalid_data in invalid_data_cases:
             with self.subTest(data=invalid_data):
                 status = OperationModeStatus.from_state_data(invalid_data)
@@ -149,17 +144,11 @@ class TestOperationModeStatus(unittest.TestCase):
     def test_update_from_state_data_changed(self):
         """Test updating from state data when operation mode changes."""
         status = OperationModeStatus(OperationMode.OTHER)
-        
+
         state_data = {
-            "state": {
-                "reported": {
-                    "features": {
-                        "operationMode": 2  # SAVINGS
-                    }
-                }
-            }
+            "state": {"reported": {"features": {"operationMode": 2}}}  # SAVINGS
         }
-        
+
         changed = status.update_from_state_data(state_data)
         self.assertTrue(changed)
         self.assertEqual(status.operation_mode, OperationMode.SAVINGS)
@@ -167,17 +156,15 @@ class TestOperationModeStatus(unittest.TestCase):
     def test_update_from_state_data_unchanged(self):
         """Test updating from state data when operation mode doesn't change."""
         status = OperationModeStatus(OperationMode.SAVINGS)
-        
+
         state_data = {
             "state": {
                 "reported": {
-                    "features": {
-                        "operationMode": 2  # SAVINGS - same as current
-                    }
+                    "features": {"operationMode": 2}  # SAVINGS - same as current
                 }
             }
         }
-        
+
         changed = status.update_from_state_data(state_data)
         self.assertFalse(changed)
         self.assertEqual(status.operation_mode, OperationMode.SAVINGS)
@@ -186,24 +173,26 @@ class TestOperationModeStatus(unittest.TestCase):
         """Test error handling in update_from_state_data."""
         # Start with OTHER mode so empty state doesn't cause a change
         status = OperationModeStatus(OperationMode.OTHER)
-        
+
         # Test with empty dict - should not change anything (defaults to OTHER)
         changed = status.update_from_state_data({})
         self.assertFalse(changed)
-        self.assertEqual(status.operation_mode, OperationMode.OTHER)  # Should remain unchanged
+        self.assertEqual(
+            status.operation_mode, OperationMode.OTHER
+        )  # Should remain unchanged
 
     def test_to_dict(self):
         """Test dictionary conversion."""
         status = OperationModeStatus(OperationMode.SAVINGS)
         result = status.to_dict()
-        
+
         expected = {
             "operation_mode": "SAVINGS",
             "operation_mode_value": 2,
             "mode_name": "Savings",
-            "is_energy_saving": True
+            "is_energy_saving": True,
         }
-        
+
         self.assertEqual(result, expected)
 
     def test_repr(self):
@@ -219,24 +208,26 @@ class TestOperationModeEvents(unittest.TestCase):
 
     def test_operation_mode_update_event_channel_exists(self):
         """Test that OPERATION_MODE_UPDATE event channel exists."""
-        self.assertTrue(hasattr(EventChannel, 'OPERATION_MODE_UPDATE'))
-        self.assertEqual(EventChannel.OPERATION_MODE_UPDATE.value, "operation_mode_update")
+        self.assertTrue(hasattr(EventChannel, "OPERATION_MODE_UPDATE"))
+        self.assertEqual(
+            EventChannel.OPERATION_MODE_UPDATE.value, "operation_mode_update"
+        )
 
     def test_event_emitter_with_operation_mode_updates(self):
         """Test EventEmitter with operation mode update events."""
         emitter = EventEmitter()
         callback_data = []
-        
+
         def operation_mode_callback(data):
             callback_data.append(data)
-        
+
         # Register callback
         emitter.on(EventChannel.OPERATION_MODE_UPDATE, operation_mode_callback)
-        
+
         # Emit event
         test_status = OperationModeStatus(OperationMode.AWAY)
         emitter.emit(EventChannel.OPERATION_MODE_UPDATE, test_status)
-        
+
         # Verify callback was called
         self.assertEqual(len(callback_data), 1)
         self.assertEqual(callback_data[0], test_status)
@@ -247,21 +238,21 @@ class TestOperationModeEvents(unittest.TestCase):
         emitter = EventEmitter()
         callback1_data = []
         callback2_data = []
-        
+
         def callback1(data):
             callback1_data.append(data)
-        
+
         def callback2(data):
             callback2_data.append(data)
-        
+
         # Register both callbacks
         emitter.on(EventChannel.OPERATION_MODE_UPDATE, callback1)
         emitter.on(EventChannel.OPERATION_MODE_UPDATE, callback2)
-        
+
         # Emit event
         test_status = OperationModeStatus(OperationMode.SUPER_SAVINGS)
         emitter.emit(EventChannel.OPERATION_MODE_UPDATE, test_status)
-        
+
         # Verify both callbacks were called
         self.assertEqual(len(callback1_data), 1)
         self.assertEqual(len(callback2_data), 1)
@@ -269,5 +260,5 @@ class TestOperationModeEvents(unittest.TestCase):
         self.assertEqual(callback2_data[0].operation_mode, OperationMode.SUPER_SAVINGS)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

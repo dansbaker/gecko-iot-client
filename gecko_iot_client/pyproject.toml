@@ -62,3 +62,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
+
+[tool.isort]
+profile = "black"
