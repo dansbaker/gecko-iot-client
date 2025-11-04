@@ -45,11 +45,13 @@ dev = [
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "isort>=5.12.0",
-    "flake8>=6.0.0"
+    "flake8>=6.0.0",
+    "auto-changelog>=0.6.0"
 ]
 
 [project.scripts]
 gecko-build-docs = "gecko_iot_client.docs:build_docs"
+gecko-build-changelog = "gecko_iot_client.changelog:build_changelog"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

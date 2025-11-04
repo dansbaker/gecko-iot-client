@@ -1,0 +1,8 @@
+{
+  "output": "CHANGELOG.md",
+  "template": "compact",
+  "unreleased": true,
+  "issueUrl": "https://github.com/geckoal/gecko-iot-client/issues/{id}",
+  "commitUrl": "https://github.com/geckoal/gecko-iot-client/commit/{id}",
+  "compareUrl": "https://github.com/geckoal/gecko-iot-client/compare/{from}...{to}"
+}

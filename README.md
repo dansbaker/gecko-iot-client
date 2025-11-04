@@ -136,6 +136,11 @@ isort src/ tests/
 
 # Build documentation
 sphinx-build docs/source docs/build/html
+
+# Generate changelog from git history
+./scripts/generate-changelog.sh
+# or using the Python entry point
+gecko-build-changelog
 ```
 
 ### Running Examples
