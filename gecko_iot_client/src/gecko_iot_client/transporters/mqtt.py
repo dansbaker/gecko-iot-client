@@ -539,8 +539,8 @@ class MqttTransporter(AbstractTransporter):
                 self._on_state_rejected,
             ),
             (
-                f"$aws/things/{self._monitor_id}/shadow/name/state/update/accepted",
-                self._on_state_update,
+                f"$aws/things/{self._monitor_id}/shadow/name/state/update/documents",
+                self._on_state_document_update,
             ),
             (
                 f"$aws/things/{self._monitor_id}/shadow/name/state/update/rejected",
@@ -719,23 +719,29 @@ class MqttTransporter(AbstractTransporter):
                 ConfigurationError(f"State rejected: {payload}")
             )
 
-    def _on_state_update(self, topic: str, payload: str):
-        """Handle state update notifications."""
+    def _on_state_document_update(self, topic: str, payload: str):
+        """Handle state document update notifications from update/documents topic."""
         try:
-            logger.info("State update received")
-            update = json.loads(payload) if payload else {}
+            logger.info("State document update received from /shadow/name/state/update/documents")
+            document = json.loads(payload) if payload else {}
+            
+            # The update/documents topic contains the full shadow document with metadata
+            # Extract the current state from the document structure
+            current_state = document.get("current", {}).get("state", {})
+            logger.info(f"Extracted state from document: {current_state}")
+            
 
-            # Notify callbacks with update
+            # Notify callbacks with the structured update
             for callback in self._state_callbacks:
                 try:
-                    callback(update)
+                    callback({"state": current_state})
                 except Exception as e:
-                    logger.error(f"Error in state update callback: {e}")
+                    logger.error(f"Error in state document update callback: {e}")
 
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse state update JSON: {e}")
+            logger.error(f"Failed to parse state document JSON: {e}")
         except Exception as e:
-            logger.error(f"State update error: {e}")
+            logger.error(f"State document update error: {e}")
 
     def _on_state_update_rejected(self, topic: str, payload: str):
         """Handle state update rejection."""
