@@ -38,6 +38,29 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install build auto-changelog setuptools-scm
 
+    - name: Fix git tag ordering for setuptools-scm
+      run: |
+        # Remove alpha tags that conflict with release tags on the same commit
+        # This ensures setuptools-scm picks up the release tag instead of alpha tag
+        current_commit=$(git rev-parse HEAD)
+        release_tag=$(git tag --list --sort=-version:refname "v*" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | head -1)
+        if [ -n "$release_tag" ]; then
+          release_commit=$(git rev-list -n 1 "$release_tag")
+          if [ "$current_commit" = "$release_commit" ]; then
+            echo "Current commit $current_commit has release tag $release_tag"
+            # Remove any alpha/beta tags on the same commit
+            git tag --list | grep -E "v.*-(alpha|beta|rc|a[0-9]+)" | while read tag; do
+              tag_commit=$(git rev-list -n 1 "$tag" 2>/dev/null || echo "")
+              if [ "$tag_commit" = "$current_commit" ]; then
+                echo "Removing conflicting tag: $tag"
+                git tag -d "$tag" || true
+              fi
+            done
+          fi
+        fi
+        # Verify the git describe result
+        echo "Git describe result: $(git describe --tags)"
+
     - name: Generate changelog
       run: |
         auto-changelog --template compact --output CHANGELOG.md --unreleased
@@ -50,6 +73,9 @@ jobs:
     - name: Build package
       run: |
         cd gecko_iot_client
+        # Set environment variable to force setuptools-scm to use the correct version
+        export SETUPTOOLS_SCM_PRETEND_VERSION=$(git describe --tags --match "v[0-9]*.[0-9]*.[0-9]*" | sed 's/^v//')
+        echo "Using version: $SETUPTOOLS_SCM_PRETEND_VERSION"
         python -m build
 
     - name: Store the distribution packages
