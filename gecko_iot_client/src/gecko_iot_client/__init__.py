@@ -15,6 +15,7 @@ from .models.zone_types import (
 )
 from .transporters import AbstractTransporter
 from .transporters.exceptions import ConfigurationTimeoutError
+from .api import GeckoApiClient
 
 # Make key classes available at package level
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "OperationMode",
     "OperationModeStatus",
     "OperationModeController",
+    "GeckoApiClient",
 ]
 
 # Get version from setuptools-scm
@@ -74,7 +76,7 @@ class GeckoIotClient:
     """
 
     def __init__(
-        self, idd: str, transporter: AbstractTransporter, config_timeout: float = 30.0
+        self, idd: str, transporter: AbstractTransporter, config_timeout: float = 5.0
     ):
         self.id = idd
         self.transporter = transporter

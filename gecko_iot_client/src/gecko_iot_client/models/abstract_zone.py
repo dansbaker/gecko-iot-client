@@ -15,16 +15,13 @@ class AbstractZone:
     _publish_callback: Optional[Callable[[str, str, Dict[str, Any]], None]] = None
 
     def __init__(
-        self, id: str, zone_type: ZoneType, name: Optional[str] = None, **kwargs
+        self, id: str, zone_type: ZoneType, config: Any, name: Optional[str] = None
     ):
         """Initialize zone with required fields."""
         self.id = id
         self.name = name
         self.zone_type = zone_type
-        # Set any additional attributes from kwargs
-        for key, value in kwargs.items():
-            if not key.startswith("_"):
-                setattr(self, key, value)
+        self.config = config
 
     def set_publish_callback(
         self, callback: Callable[[str, str, Dict[str, Any]], None]

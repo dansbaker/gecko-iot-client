@@ -44,7 +44,7 @@ class LightingZone(AbstractZone):
             id=zone_id,
             zone_type=ZoneType.LIGHTING_ZONE,
             name=config.get("name"),
-            **{k: v for k, v in config.items() if k not in ["name"]},
+            config=config,
         )
 
         # Initialize lighting zone specific attributes

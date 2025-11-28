@@ -38,7 +38,7 @@ class MqttTransporter(AbstractTransporter):
         self,
         broker_url: str,
         monitor_id: str,
-        token_refresh_callback: Optional[Callable[[], str]] = None,
+        token_refresh_callback: Optional[Callable[[str], str]] = None,
         token_refresh_buffer_seconds: int = DEFAULT_TOKEN_REFRESH_BUFFER,
     ):
         """
@@ -88,6 +88,9 @@ class MqttTransporter(AbstractTransporter):
 
     def connect(self, **kwargs):
         """Connect using preformatted WebSocket URL with expiration management."""
+        # Clear stop event to allow reconnection
+        self._monitor_stop_event.clear()
+        
         if self._connected:
             logger.info("Already connected")
             return
@@ -238,7 +241,7 @@ class MqttTransporter(AbstractTransporter):
             logger.info("Refreshing token and reconnecting...")
 
             # Get new broker URL with fresh token
-            new_broker_url = self._token_refresh_callback()
+            new_broker_url = self._token_refresh_callback(self._monitor_id)
             if not new_broker_url:
                 logger.error("Token refresh callback returned empty URL")
                 return
@@ -293,7 +296,10 @@ class MqttTransporter(AbstractTransporter):
 
     def disconnect(self):
         """Disconnect and cleanup."""
-        # Stop expiry monitoring
+        # Set stop event FIRST to prevent reconnection attempts
+        self._monitor_stop_event.set()
+        
+        # Stop expiry monitoring (if running)
         self._stop_expiry_monitoring()
 
         if not self._connected or not self._client:

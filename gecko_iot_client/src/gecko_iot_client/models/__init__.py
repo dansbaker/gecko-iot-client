@@ -4,6 +4,7 @@ from .connectivity import ConnectivityStatus
 from .events import EventChannel, EventEmitter
 from .operation_mode import OperationMode, OperationModeStatus
 from .zone_parser import ZoneConfigurationParser
+from .flow_zone import FlowZoneCapabilities, FlowZonePreset
 from .zone_types import (
     RGB,
     AbstractZone,
@@ -24,6 +25,8 @@ __all__ = [
     "TemperatureControlMode",
     "FlowZone",
     "FlowZoneInitiator",
+    "FlowZoneCapabilities",
+    "FlowZonePreset",
     "LightingZone",
     "RGB",
     "ZoneConfigurationParser",

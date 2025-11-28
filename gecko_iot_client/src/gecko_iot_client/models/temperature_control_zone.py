@@ -57,7 +57,7 @@ class TemperatureControlZone(AbstractZone):
             id=zone_id,
             zone_type=ZoneType.TEMPERATURE_CONTROL_ZONE,
             name=config.get("name"),
-            **{k: v for k, v in config.items() if k not in ["name"]},
+            config=config,
         )
 
         # Initialize temperature control specific attributes
