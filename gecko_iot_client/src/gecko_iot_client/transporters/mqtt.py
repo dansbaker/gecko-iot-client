@@ -29,6 +29,190 @@ DEFAULT_TOKEN_REFRESH_BUFFER = 300  # 5 minutes before expiry
 MAX_RECONNECT_ATTEMPTS = 5
 RECONNECT_BASE_DELAY = 1.0
 RECONNECT_MAX_DELAY = 60.0
+SUBSCRIPTION_TIMEOUT = 5.0
+CONNECTION_TIMEOUT = 10
+PUBLISH_TIMEOUT = 5.0
+SUBSCRIPTION_SETTLE_DELAY = 2.0
+
+
+# Type aliases for clarity
+StateCallback = Callable[[Dict[str, Any]], None]
+TopicHandler = Callable[[str, str], None]
+
+
+# Utility functions for error handling and callback notification
+def _parse_json_safely(payload: str) -> Optional[Dict[str, Any]]:
+    """Safely parse JSON payload, returning None on error."""
+    if not payload:
+        return {}
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON: {e}")
+        return None
+
+
+def _complete_future_safely(
+    future: Optional[Future], result: Any = None, error: Optional[Exception] = None
+) -> None:
+    """Complete a future with result or exception if not already done."""
+    if future and not future.done():
+        if error:
+            future.set_exception(error)
+        else:
+            future.set_result(result)
+
+
+def _notify_callbacks_safely(callbacks: list, data: Any) -> None:
+    """Notify all callbacks, catching and logging individual errors."""
+    for callback in callbacks:
+        try:
+            callback(data)
+        except Exception as e:
+            logger.error(f"Error in callback: {e}")
+
+
+class _TokenManager:
+    """Manages JWT token parsing, expiry tracking, and refresh timing."""
+
+    def __init__(self, broker_url: str, refresh_buffer_seconds: int):
+        self._broker_url = broker_url
+        self._refresh_buffer = refresh_buffer_seconds
+        self._current_token: Optional[str] = None
+        self._token_expiry: Optional[datetime] = None
+        self._parse_token()
+
+    def _parse_token(self) -> None:
+        """Parse JWT token from broker URL to extract expiry."""
+        try:
+            parsed_url = urllib.parse.urlparse(self._broker_url)
+            query_params = urllib.parse.parse_qs(parsed_url.query)
+            token = query_params.get("token", [None])[0]
+
+            if not token:
+                return
+
+            # Decode JWT payload (second part of token)
+            parts = token.split(".")
+            if len(parts) < 2:
+                logger.warning("Invalid JWT token format")
+                return
+
+            # Decode payload with padding
+            payload_part = parts[1]
+            payload_part += "=" * (4 - len(payload_part) % 4)
+            payload_bytes = base64.urlsafe_b64decode(payload_part)
+            payload_json = json.loads(payload_bytes)
+
+            exp_timestamp = payload_json.get("exp")
+            if exp_timestamp:
+                self._token_expiry = datetime.fromtimestamp(exp_timestamp)
+                self._current_token = token
+                logger.info(f"Token expires at: {self._token_expiry}")
+            else:
+                logger.warning("JWT token does not contain expiry claim")
+
+        except Exception as e:
+            logger.warning(f"Failed to parse token expiry: {e}")
+
+    def update_broker_url(self, new_broker_url: str) -> None:
+        """Update broker URL and re-parse token."""
+        self._broker_url = new_broker_url
+        self._parse_token()
+
+    def is_expired(self) -> bool:
+        """Check if token is currently expired."""
+        if not self._token_expiry:
+            return False
+        return datetime.now() >= self._token_expiry
+
+    def should_refresh(self, is_connected: bool) -> bool:
+        """Check if token should be refreshed based on expiry buffer."""
+        if not self._token_expiry or not is_connected:
+            return False
+        time_to_expiry = self._token_expiry - datetime.now()
+        return time_to_expiry.total_seconds() <= self._refresh_buffer
+
+    def force_expiry(self) -> None:
+        """Force token to be expired (for handling authorization failures)."""
+        self._token_expiry = datetime.now()
+
+    @property
+    def expiry(self) -> Optional[datetime]:
+        """Get token expiry datetime."""
+        return self._token_expiry
+
+
+class _ReconnectionHandler:
+    """Manages reconnection attempts with exponential backoff."""
+
+    def __init__(
+        self,
+        max_attempts: int = MAX_RECONNECT_ATTEMPTS,
+        base_delay: float = RECONNECT_BASE_DELAY,
+        max_delay: float = RECONNECT_MAX_DELAY,
+    ):
+        self._max_attempts = max_attempts
+        self._base_delay = base_delay
+        self._max_delay = max_delay
+        self._attempts = 0
+
+    def should_attempt(self) -> bool:
+        """Check if another reconnection attempt should be made."""
+        return self._attempts < self._max_attempts
+
+    def get_delay(self) -> float:
+        """Calculate delay for next reconnection attempt with exponential backoff."""
+        return min(self._base_delay * (2**self._attempts), self._max_delay)
+
+    def on_attempt(self) -> int:
+        """Record a reconnection attempt and return attempt number."""
+        self._attempts += 1
+        return self._attempts
+
+    def on_success(self) -> None:
+        """Reset attempt counter after successful connection."""
+        self._attempts = 0
+
+    @property
+    def attempts(self) -> int:
+        """Get current number of attempts."""
+        return self._attempts
+
+
+class _CallbackRegistry:
+    """Thread-safe registry for managing callbacks by category."""
+
+    def __init__(self):
+        self._callbacks: Dict[str, list] = {}
+        self._lock = threading.RLock()
+
+    def register(self, category: str, callback: Callable) -> None:
+        """Register a callback for a specific category."""
+        with self._lock:
+            if category not in self._callbacks:
+                self._callbacks[category] = []
+            if callback not in self._callbacks[category]:
+                self._callbacks[category].append(callback)
+
+    def get_callbacks(self, category: str) -> list:
+        """Get all callbacks for a category (returns copy for thread safety)."""
+        with self._lock:
+            return self._callbacks.get(category, []).copy()
+
+    def notify(self, category: str, data: Any) -> None:
+        """Notify all callbacks in a category with data."""
+        with self._lock:
+            callbacks = self._callbacks.get(category, []).copy()
+        _notify_callbacks_safely(callbacks, data)
+
+    def clear(self, category: Optional[str] = None) -> None:
+        """Clear callbacks for a category or all categories."""
+        with self._lock:
+            if category:
+                self._callbacks.pop(category, None)
+            else:
+                self._callbacks.clear()
 
 
 class MqttTransporter(AbstractTransporter):
@@ -56,23 +240,21 @@ class MqttTransporter(AbstractTransporter):
         self._broker_url = broker_url
         self._monitor_id = monitor_id
         self._token_refresh_callback = token_refresh_callback
-        self._token_refresh_buffer = token_refresh_buffer_seconds
+
+        # Helper components
+        self._token_manager = _TokenManager(broker_url, token_refresh_buffer_seconds)
+        self._reconnection_handler = _ReconnectionHandler()
+        self._callback_registry = _CallbackRegistry()
 
         # Connection state
         self._client: Optional[mqtt5.Client] = None
         self._connected = False
-        self._client_id = f"gecko-{monitor_id}-{int(time.time())}"
-        self._reconnect_attempts = 0
+        self._client_id = f"ha-{monitor_id}-{int(time.time())}"
+        self._is_refreshing_token = False
+        self._state_lock = threading.RLock()
 
-        # Token management
-        self._current_token: Optional[str] = None
-        self._token_expiry: Optional[datetime] = None
-
-        # Callback storage
-        self._state_callbacks = []
-        self._config_callbacks = []
-        self._connectivity_callbacks = []
-        self._topic_handlers: Dict[str, Callable] = {}
+        # Topic handlers (direct mapping, not in callback registry)
+        self._topic_handlers: Dict[str, TopicHandler] = {}
 
         # Loading state
         self._config_future: Optional[Future] = None
@@ -83,28 +265,44 @@ class MqttTransporter(AbstractTransporter):
         self._monitor_thread: Optional[threading.Thread] = None
         self._monitor_stop_event = threading.Event()
 
-        # Parse initial token expiry
-        self._parse_token_expiry()
-
     def connect(self, **kwargs):
         """Connect using preformatted WebSocket URL with expiration management."""
-        # Clear stop event to allow reconnection
         self._monitor_stop_event.clear()
         
-        if self._connected:
-            logger.info("Already connected")
-            return
+        with self._state_lock:
+            if self._connected:
+                logger.info("Already connected")
+                return
+
+        # Check if token is already expired before attempting connection
+        if self._token_manager.is_expired():
+            logger.warning("Token expired, refreshing before connection")
+            if self._token_refresh_callback:
+                self._refresh_token_before_connect()
 
         try:
             self._do_connect(**kwargs)
 
             # Start expiry monitoring after successful connection
-            if self._token_refresh_callback and self._token_expiry:
+            if self._token_refresh_callback and self._token_manager.expiry:
                 self._start_expiry_monitoring()
 
         except Exception as e:
             logger.error(f"Connection failed: {e}")
             raise ConnectionError(f"Connection failed: {e}")
+    
+    def _refresh_token_before_connect(self) -> None:
+        """Refresh token before initial connection attempt."""
+        try:
+            new_broker_url = self._token_refresh_callback(self._monitor_id)
+            if new_broker_url:
+                self._broker_url = new_broker_url
+                self._token_manager.update_broker_url(new_broker_url)
+                logger.info("Token refreshed successfully before connection")
+            else:
+                logger.error("Token refresh callback returned empty URL")
+        except Exception as e:
+            logger.error(f"Failed to refresh expired token before connection: {e}")
 
     def _do_connect(self, **kwargs):
         """Internal connection logic."""
@@ -154,41 +352,6 @@ class MqttTransporter(AbstractTransporter):
                 self._client = None
             raise
 
-    def _parse_token_expiry(self):
-        """Parse JWT token from broker URL to extract expiry."""
-        try:
-            parsed_url = urllib.parse.urlparse(self._broker_url)
-            query_params = urllib.parse.parse_qs(parsed_url.query)
-            token = query_params.get("token", [None])[0]
-
-            if token:
-                # Decode JWT header and payload manually for expiry check
-                try:
-                    # Split JWT token into parts
-                    parts = token.split(".")
-                    if len(parts) >= 2:
-                        # Decode payload (second part)
-                        payload_part = parts[1]
-                        # Add padding if needed
-                        payload_part += "=" * (4 - len(payload_part) % 4)
-                        payload_bytes = base64.urlsafe_b64decode(payload_part)
-                        payload_json = json.loads(payload_bytes)
-
-                        exp_timestamp = payload_json.get("exp")
-                        if exp_timestamp:
-                            self._token_expiry = datetime.fromtimestamp(exp_timestamp)
-                            self._current_token = token
-                            logger.info(f"Token expires at: {self._token_expiry}")
-                        else:
-                            logger.warning("JWT token does not contain expiry claim")
-                    else:
-                        logger.warning("Invalid JWT token format")
-                except Exception as e:
-                    logger.warning(f"Failed to decode JWT token: {e}")
-
-        except Exception as e:
-            logger.warning(f"Failed to parse token expiry: {e}")
-
     def _start_expiry_monitoring(self):
         """Start monitoring token expiry in background thread."""
         if self._monitor_thread and self._monitor_thread.is_alive():
@@ -225,11 +388,7 @@ class MqttTransporter(AbstractTransporter):
 
     def _should_refresh_token(self) -> bool:
         """Check if token needs refreshing."""
-        if not self._token_expiry or not self._connected:
-            return False
-
-        time_to_expiry = self._token_expiry - datetime.now()
-        return time_to_expiry.total_seconds() <= self._token_refresh_buffer
+        return self._token_manager.should_refresh(self._connected)
 
     def _handle_token_refresh(self):
         """Handle token refresh and reconnection."""
@@ -237,6 +396,9 @@ class MqttTransporter(AbstractTransporter):
             logger.warning("No token refresh callback configured")
             return
 
+        with self._state_lock:
+            self._is_refreshing_token = True
+        
         try:
             logger.info("Refreshing token and reconnecting...")
 
@@ -244,40 +406,52 @@ class MqttTransporter(AbstractTransporter):
             new_broker_url = self._token_refresh_callback(self._monitor_id)
             if not new_broker_url:
                 logger.error("Token refresh callback returned empty URL")
+                with self._state_lock:
+                    self._is_refreshing_token = False
+                self._schedule_reconnect()
                 return
 
-            # Disconnect current connection
-            old_connected = self._connected
-            self.disconnect()
+            # Stop the old client without triggering full disconnect logic
+            if self._client:
+                try:
+                    logger.info("Stopping old MQTT client...")
+                    self._client.stop()
+                    self._client = None
+                    with self._state_lock:
+                        self._connected = False
+                except Exception as e:
+                    logger.warning(f"Error stopping old client: {e}")
 
-            # Update broker URL and parse new token
+            # Update broker URL and token expiry
             self._broker_url = new_broker_url
-            self._parse_token_expiry()
+            self._token_manager.update_broker_url(new_broker_url)
 
-            # Reconnect if we were previously connected
-            if old_connected:
+            # Attempt to reconnect after token refresh
+            try:
                 self._do_connect()
                 logger.info("Successfully refreshed token and reconnected")
+                self._reconnection_handler.on_success()
+            except Exception as e:
+                logger.error(f"Reconnection after token refresh failed: {e}")
+                self._schedule_reconnect()
 
         except Exception as e:
             logger.error(f"Token refresh failed: {e}")
-            # Attempt exponential backoff reconnection
             self._schedule_reconnect()
+        finally:
+            with self._state_lock:
+                self._is_refreshing_token = False
 
     def _schedule_reconnect(self):
         """Schedule reconnection with exponential backoff."""
-        if self._reconnect_attempts >= MAX_RECONNECT_ATTEMPTS:
+        if not self._reconnection_handler.should_attempt():
             logger.error("Max reconnection attempts reached, giving up")
             return
 
-        delay = min(
-            RECONNECT_BASE_DELAY * (2**self._reconnect_attempts), RECONNECT_MAX_DELAY
-        )
-        self._reconnect_attempts += 1
+        delay = self._reconnection_handler.get_delay()
+        attempt_num = self._reconnection_handler.on_attempt()
 
-        logger.info(
-            f"Scheduling reconnection attempt {self._reconnect_attempts} in {delay} seconds"
-        )
+        logger.info(f"Scheduling reconnection attempt {attempt_num} in {delay} seconds")
 
         def delayed_reconnect():
             time.sleep(delay)
@@ -285,10 +459,9 @@ class MqttTransporter(AbstractTransporter):
                 try:
                     self._do_connect()
                     logger.info("Reconnection successful")
+                    self._reconnection_handler.on_success()
                 except Exception as e:
-                    logger.error(
-                        f"Reconnection attempt {self._reconnect_attempts} failed: {e}"
-                    )
+                    logger.error(f"Reconnection attempt {attempt_num} failed: {e}")
                     self._schedule_reconnect()
 
         reconnect_thread = threading.Thread(target=delayed_reconnect, daemon=True)
@@ -296,39 +469,44 @@ class MqttTransporter(AbstractTransporter):
 
     def disconnect(self):
         """Disconnect and cleanup."""
-        # Set stop event FIRST to prevent reconnection attempts
         self._monitor_stop_event.set()
-        
-        # Stop expiry monitoring (if running)
         self._stop_expiry_monitoring()
 
-        if not self._connected or not self._client:
-            return
+        with self._state_lock:
+            if not self._connected or not self._client:
+                return
+            client = self._client
 
         try:
             logger.info("Disconnecting from AWS IoT...")
-            self._client.stop()
+            client.stop()
 
             # Wait for disconnection
             start_time = time.time()
             while self._connected and (time.time() - start_time) < 5:
                 time.sleep(0.1)
 
-            self._connected = False
-            self._client = None
-            self._topic_handlers.clear()
-            self._subscriptions_setup = False
+            with self._state_lock:
+                self._connected = False
+                self._client = None
+                self._topic_handlers.clear()
+                self._subscriptions_setup = False
 
             logger.info("Disconnected successfully")
 
         except Exception as e:
             logger.error(f"Disconnect error: {e}")
-            self._connected = False
-            self._client = None
+            with self._state_lock:
+                self._connected = False
+                self._client = None
 
     def is_connected(self) -> bool:
         """Check if connected to broker."""
         return self._connected
+
+    def _topic(self, path: str) -> str:
+        """Build AWS IoT topic for this monitor."""
+        return f"$aws/things/{self._monitor_id}/{path}"
 
     # AbstractTransporter interface implementation
 
@@ -346,10 +524,10 @@ class MqttTransporter(AbstractTransporter):
             logger.info("Configuration request already in progress")
             return
 
-        logger.info(f"🔄 Loading configuration for monitor_id: {self._monitor_id}")
+        logger.info(f"Loading configuration for monitor_id: {self._monitor_id}")
 
         self._config_future = Future()
-        topic = f"$aws/things/{self._monitor_id}/config/get"
+        topic = self._topic("config/get")
 
         try:
             logger.info(f"📤 Publishing configuration request to: {topic}")
@@ -362,7 +540,7 @@ class MqttTransporter(AbstractTransporter):
                     f"✅ Configuration request successfully published to {topic}"
                 )
             except Exception as e:
-                logger.error(f"❌ Failed to publish configuration request: {e}")
+                logger.error(f"Failed to publish configuration request: {e}")
                 raise ConfigurationError(f"Failed to publish config request: {e}")
 
             logger.info(
@@ -371,12 +549,12 @@ class MqttTransporter(AbstractTransporter):
 
             # Wait for response with timeout
             result = self._config_future.result(timeout=timeout)
-            logger.info("✅ Configuration loaded successfully")
+            logger.info("Configuration loaded successfully")
             return result
 
         except Exception as e:
             self._config_future = None
-            logger.error(f"❌ Configuration loading failed: {e}")
+            logger.error(f"Configuration loading failed: {e}")
             raise ConfigurationError(f"Configuration loading failed: {e}")
 
     def load_state(self):
@@ -395,7 +573,7 @@ class MqttTransporter(AbstractTransporter):
         logger.info(f"Loading state for monitor_id: {self._monitor_id}")
 
         self._state_future = Future()
-        topic = f"$aws/things/{self._monitor_id}/shadow/name/state/get"
+        topic = self._topic("shadow/name/state/get")
 
         try:
             self._publish(topic, "{}")
@@ -424,7 +602,7 @@ class MqttTransporter(AbstractTransporter):
             raise ConnectionError(NOT_CONNECTED_ERROR)
 
         payload = {"state": {"desired": desired_state}}
-        topic = f"$aws/things/{self._monitor_id}/shadow/name/state/update"
+        topic = self._topic("shadow/name/state/update")
         return self._publish(topic, json.dumps(payload))
 
     def publish_batch_desired_state(
@@ -434,43 +612,35 @@ class MqttTransporter(AbstractTransporter):
         desired_state = {"zones": zone_updates}
         return self.publish_desired_state(desired_state)
 
-    def _register_callback(self, callback_list: list, callback: Callable):
-        """Generic callback registration helper."""
-        if callback not in callback_list:
-            callback_list.append(callback)
-
     def on_configuration_loaded(self, callback):
         """Register config callback."""
-        self._register_callback(self._config_callbacks, callback)
+        self._callback_registry.register("config", callback)
 
     def on_state_loaded(self, callback):
         """Register state callback."""
-        self._register_callback(self._state_callbacks, callback)
+        self._callback_registry.register("state", callback)
 
     def on_state_change(self, callback):
         """Register state change callback."""
-        self._register_callback(self._state_callbacks, callback)
+        self._callback_registry.register("state_update", callback)
 
     def on_connectivity_change(self, callback):
         """Register connectivity change callback."""
-        self._register_callback(self._connectivity_callbacks, callback)
+        self._callback_registry.register("connectivity", callback)
 
     def change_state(self, new_state):
         """Change state (placeholder for interface compliance)."""
-        # Notify state change callbacks
-        for callback in self._state_callbacks:
-            try:
-                callback(new_state)
-            except Exception as e:
-                logger.error(f"Error in state change callback: {e}")
+        _notify_callbacks_safely(
+            self._callback_registry.get_callbacks("state_update"), 
+            new_state
+        )
 
     def _notify_connectivity_change(self, mqtt_connected: bool):
         """Notify all connectivity callbacks of MQTT connection status change."""
-        for callback in self._connectivity_callbacks:
-            try:
-                callback(mqtt_connected)
-            except Exception as e:
-                logger.error(f"Error in connectivity change callback: {e}")
+        _notify_callbacks_safely(
+            self._callback_registry.get_callbacks("connectivity"),
+            mqtt_connected
+        )
 
     # Internal implementation methods
 
@@ -529,27 +699,27 @@ class MqttTransporter(AbstractTransporter):
 
         topics = [
             (
-                f"$aws/things/{self._monitor_id}/config/get/accepted",
+                self._topic("config/get/accepted"),
                 self._on_config_response,
             ),
             (
-                f"$aws/things/{self._monitor_id}/config/get/rejected",
+                self._topic("config/get/rejected"),
                 self._on_config_rejected,
             ),
             (
-                f"$aws/things/{self._monitor_id}/shadow/name/state/get/accepted",
+                self._topic("shadow/name/state/get/accepted"),
                 self._on_state_response,
             ),
             (
-                f"$aws/things/{self._monitor_id}/shadow/name/state/get/rejected",
+                self._topic("shadow/name/state/get/rejected"),
                 self._on_state_rejected,
             ),
             (
-                f"$aws/things/{self._monitor_id}/shadow/name/state/update/documents",
+                self._topic("shadow/name/state/update/documents"),
                 self._on_state_document_update,
             ),
             (
-                f"$aws/things/{self._monitor_id}/shadow/name/state/update/rejected",
+                self._topic("shadow/name/state/update/rejected"),
                 self._on_state_update_rejected,
             ),
         ]
@@ -560,9 +730,9 @@ class MqttTransporter(AbstractTransporter):
                 logger.info(f"🎯 Subscribing to: {topic}")
                 self._subscribe_sync(topic, handler)
                 successful_subscriptions += 1
-                logger.info(f"✅ Successfully subscribed to {topic}")
+                logger.info(f"Successfully subscribed to {topic}")
             except Exception as e:
-                logger.error(f"❌ Failed to subscribe to {topic}: {e}")
+                logger.error(f"Failed to subscribe to {topic}: {e}")
 
         if successful_subscriptions > 0:
             self._subscriptions_setup = True
@@ -574,9 +744,9 @@ class MqttTransporter(AbstractTransporter):
             # subscriptions are fully active on the AWS side
             logger.info("⏳ Waiting for AWS IoT to fully establish subscriptions...")
             time.sleep(2.0)  # Simple 2-second delay to ensure routing is ready
-            logger.info("✅ Subscriptions should now be fully established")
+            logger.info("Subscriptions should now be fully established")
         else:
-            logger.error("❌ Failed to set up any subscriptions")
+            logger.error("Failed to set up any subscriptions")
             raise ConnectionError("Failed to establish subscriptions")
 
     def _subscribe_sync(self, topic: str, handler: Callable):
@@ -624,7 +794,7 @@ class MqttTransporter(AbstractTransporter):
                 else ""
             )
 
-            logger.info(f"📥 Received message on topic '{topic}': {payload[:100]}...")
+            logger.info(f"Received message on topic '{topic}': {payload[:100]}...")
 
             handler = self._topic_handlers.get(topic)
             if handler:
@@ -632,7 +802,7 @@ class MqttTransporter(AbstractTransporter):
                     logger.info(f"🎯 Routing message to handler for topic: {topic}")
                     handler(topic, payload)
                 except Exception as e:
-                    logger.error(f"❌ Handler error for {topic}: {e}")
+                    logger.error(f"Handler error for {topic}: {e}")
             else:
                 logger.warning(f"⚠️  No handler registered for topic '{topic}'")
                 logger.info(
@@ -640,50 +810,36 @@ class MqttTransporter(AbstractTransporter):
                 )
 
         except Exception as e:
-            logger.error(f"❌ Error in message handler: {e}")
+            logger.error(f"Error in message handler: {e}")
 
     def _on_config_response(self, topic: str, payload: str):
         """Handle configuration response."""
-        try:
-            logger.info(f"📥 Configuration response received on topic: {topic}")
-            logger.info(
-                f"📄 Payload: {payload[:200]}..."
-                if len(payload) > 200
-                else f"📄 Payload: {payload}"
-            )
+        logger.info(f"Configuration response received on topic: {topic}")
+        logger.info(
+            f"Payload: {payload[:200]}..."
+            if len(payload) > 200
+            else f"Payload: {payload}"
+        )
 
-            config = json.loads(payload) if payload else {}
+        config = _parse_json_safely(payload)
+        if config:
             config = config.get("configuration", {}).get("configuration", {})
-
-            # Notify callbacks
-            for callback in self._config_callbacks:
-                try:
-                    callback(config)
-                except Exception as e:
-                    logger.error(f"Error in config callback: {e}")
-
-            # Complete future
-            if self._config_future and not self._config_future.done():
-                self._config_future.set_result(config)
-                logger.info("✅ Configuration future completed")
-            else:
-                logger.warning("No pending config future to complete")
-
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ Failed to parse config JSON: {e}")
+            _notify_callbacks_safely(
+                self._callback_registry.get_callbacks("config"),
+                config
+            )
+            _complete_future_safely(self._config_future, config)
+        else:
+            logger.error("Failed to parse configuration response")
             if self._config_future and not self._config_future.done():
                 self._config_future.set_exception(
-                    ConfigurationError(f"Invalid JSON: {e}")
+                    ConfigurationError("Invalid JSON in configuration response")
                 )
-        except Exception as e:
-            logger.error(f"❌ Config response error: {e}")
-            if self._config_future and not self._config_future.done():
-                self._config_future.set_exception(ConfigurationError(str(e)))
 
     def _on_config_rejected(self, topic: str, payload: str):
         """Handle configuration request rejection."""
-        logger.warning(f"❌ Configuration request rejected on topic: {topic}")
-        logger.warning(f"📄 Rejection payload: {payload}")
+        logger.warning(f"Configuration request rejected on topic: {topic}")
+        logger.warning(f"Rejection payload: {payload}")
         if self._config_future and not self._config_future.done():
             self._config_future.set_exception(
                 ConfigurationError(f"Configuration rejected: {payload}")
@@ -691,31 +847,21 @@ class MqttTransporter(AbstractTransporter):
 
     def _on_state_response(self, topic: str, payload: str):
         """Handle state response."""
-        try:
-            logger.info("State response received")
-            state = json.loads(payload) if payload else {}
-
-            # Notify callbacks
-            for callback in self._state_callbacks:
-                try:
-                    callback(state)
-                except Exception as e:
-                    logger.error(f"Error in state callback: {e}")
-
-            # Complete future
-            if self._state_future and not self._state_future.done():
-                self._state_future.set_result(state)
-
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse state JSON: {e}")
+        logger.info("State response received")
+        state = _parse_json_safely(payload)
+        
+        if state:
+            _notify_callbacks_safely(
+                self._callback_registry.get_callbacks("state"),
+                state
+            )
+            _complete_future_safely(self._state_future, state)
+        else:
+            logger.error("Failed to parse state response")
             if self._state_future and not self._state_future.done():
                 self._state_future.set_exception(
-                    ConfigurationError(f"Invalid JSON: {e}")
+                    ConfigurationError("Invalid JSON in state response")
                 )
-        except Exception as e:
-            logger.error(f"State response error: {e}")
-            if self._state_future and not self._state_future.done():
-                self._state_future.set_exception(ConfigurationError(str(e)))
 
     def _on_state_rejected(self, topic: str, payload: str):
         """Handle state request rejection."""
@@ -727,27 +873,20 @@ class MqttTransporter(AbstractTransporter):
 
     def _on_state_document_update(self, topic: str, payload: str):
         """Handle state document update notifications from update/documents topic."""
-        try:
-            logger.info("State document update received from /shadow/name/state/update/documents")
-            document = json.loads(payload) if payload else {}
-            
-            # The update/documents topic contains the full shadow document with metadata
+        logger.info("State document update received from /shadow/name/state/update/documents")
+        document = _parse_json_safely(payload)
+        
+        if document:
             # Extract the current state from the document structure
             current_state = document.get("current", {}).get("state", {})
             logger.info(f"Extracted state from document: {current_state}")
             
-
-            # Notify callbacks with the structured update
-            for callback in self._state_callbacks:
-                try:
-                    callback({"state": current_state})
-                except Exception as e:
-                    logger.error(f"Error in state document update callback: {e}")
-
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse state document JSON: {e}")
-        except Exception as e:
-            logger.error(f"State document update error: {e}")
+            _notify_callbacks_safely(
+                self._callback_registry.get_callbacks("state_update"),
+                {"state": current_state}
+            )
+        else:
+            logger.error("Failed to parse state document update")
 
     def _on_state_update_rejected(self, topic: str, payload: str):
         """Handle state update rejection."""
@@ -755,27 +894,51 @@ class MqttTransporter(AbstractTransporter):
 
     # Lifecycle callbacks
 
-    def _on_connection_success(self, connack_packet):
+    def _on_connection_success(self, connack_packet: mqtt5.LifecycleConnectSuccessData):
         """Handle successful connection."""
         logger.info(f"Connection successful: {connack_packet}")
-        self._connected = True
+        with self._state_lock:
+            self._connected = True
+        self._reconnection_handler.on_success()
         self._notify_connectivity_change(True)
 
-    def _on_connection_failure(self, connack_packet):
+    def _on_connection_failure(self, connack_packet: mqtt5.LifecycleConnectFailureData):
         """Handle connection failure."""
         logger.error(f"Connection failed: {connack_packet}")
-        self._connected = False
+        with self._state_lock:
+            self._connected = False
         self._notify_connectivity_change(False)
 
-    def _on_disconnection(self, disconnect_packet):
+        # Check if this is an authorization failure (likely expired token)
+        if connack_packet.connack_packet and connack_packet.connack_packet.reason_code == mqtt5.ConnectReasonCode.NOT_AUTHORIZED:
+            logger.warning("Connection failed due to authorization - token may be expired")
+            # If we have a refresh callback, attempt token refresh
+            if self._token_refresh_callback and not self._monitor_stop_event.is_set():
+                logger.info("Triggering token refresh due to authorization failure...")
+                # Mark token as expired to force immediate refresh
+                self._token_manager.force_expiry()
+                # Attempt token refresh and reconnection
+                threading.Thread(target=self._handle_token_refresh, daemon=True).start()
+                return
+
+        # For other failures, schedule normal reconnect if we have a refresh callback
+        if self._token_refresh_callback and not self._monitor_stop_event.is_set():
+            logger.info("Connection failed, scheduling reconnection...")
+            self._schedule_reconnect()
+
+    def _on_disconnection(self, disconnect_packet: mqtt5.LifecycleDisconnectData):
         """Handle disconnection."""
         logger.info(f"Disconnected: {disconnect_packet}")
         self._connected = False
         self._notify_connectivity_change(False)
 
+        # Don't schedule reconnect if we're in the middle of a token refresh
+        # or if we've been asked to stop
+        if self._is_refreshing_token:
+            logger.info("Disconnection during token refresh - ignoring")
+            return
+            
         # If we have a token refresh callback, attempt to reconnect
         if self._token_refresh_callback and not self._monitor_stop_event.is_set():
             logger.info("Unexpected disconnection, attempting to reconnect...")
             self._schedule_reconnect()
-
-    """AWS IoT MQTT5 client transporter with token refresh capabilities."""

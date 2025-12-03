@@ -202,6 +202,15 @@ class GeckoIotClient:
             if status_obj.update_from_state_data(state_data):
                 self._logger.info(log_formatter(status_obj))
                 self._event_emitter.emit(event_channel, status_obj)
+        
+        # Apply state updates to zones
+        if self._zones:
+            try:
+                self._zone_parser.apply_state_to_zones(self._zones, state_data)
+                self._logger.info("State updates applied to zones")
+                self._notify_zone_updates()
+            except Exception as e:
+                self._logger.error(f"Failed to apply state updates to zones: {e}")
 
     @property
     def connectivity_status(self) -> ConnectivityStatus:
@@ -280,7 +289,7 @@ class GeckoIotClient:
         """Handle state changes."""
         self._logger.debug(f"State changed to: {new_state}")
 
-        # Process all state updates using unified handler
+        # Process all state updates using unified handler (includes zone updates)
         self._process_state_updates(new_state)
 
     def _on_state_loaded(self, state_data):
@@ -289,22 +298,12 @@ class GeckoIotClient:
         self._state = state_data
         self._logger.debug(f"State data: {state_data}")
 
-        # Process all state updates using unified handler
+        # Process all state updates using unified handler (includes zone updates)
         self._process_state_updates(state_data)
 
-        # Apply state data to existing zones
+        # Ensure zone control is set up after state is applied
         if self._zones:
-            try:
-                self._zone_parser.apply_state_to_zones(self._zones, state_data)
-                self._logger.info("State data applied to zones")
-
-                # Ensure zone control is set up after state is applied
-                self.setup_zone_control()
-
-                # Notify zone update callbacks
-                self._notify_zone_updates()
-            except Exception as e:
-                self._logger.error(f"Failed to apply state to zones: {e}")
+            self.setup_zone_control()
 
     def get_zones(self) -> Dict[ZoneType, List[AbstractZone]]:
         """

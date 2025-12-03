@@ -155,7 +155,7 @@ class TemperatureControlZone(AbstractZone):
             )
 
         self.set_point = temperature
-        self._publish_desired_state({"set_point": temperature})
+        self._publish_desired_state({"setPoint": temperature})
 
     def get_temperature_state(self) -> Dict[str, Any]:
         """Get the current temperature state as a simple dictionary."""
@@ -168,22 +168,6 @@ class TemperatureControlZone(AbstractZone):
 
     def _get_runtime_state_fields(self) -> set:
         return {"temperature_", "set_point", "mode_", "status_"}
-
-    def _get_field_mappings(self) -> Dict[str, str]:
-        """
-        Temperature control zone specific field mappings.
-
-        Returns:
-            Dictionary mapping external field names to internal field names
-        """
-        return {
-            "setPoint": "set_point",
-            "currentTemperature": "temperature_",
-            "temperature": "temperature_",
-            "targetTemperature": "set_point",
-            "actualTemperature": "temperature_",
-            "status": "status_",
-        }
 
     def _convert_status_to_enum(
         self, status_value: Any
@@ -223,27 +207,25 @@ class TemperatureControlZone(AbstractZone):
         return None
 
     def update_from_state(self, state: Dict[str, Any]) -> None:
-        """Update temperature control zone from runtime state with special handling for status enum."""
-        # Create a copy to avoid modifying original state dict
-        state = state.copy()
+        """Update temperature control zone from runtime state."""
+        
+        if "temperature_" in state:
+            self.temperature_ = state["temperature_"]
+        
+        if "setPoint" in state:
+            self.set_point = state["setPoint"]
 
-        # Handle status conversion if it's present in either form
-        status_value = state.get("status") or state.get("status_")
+        # Handle status conversion
+        status_value = state.get("status_")
         if status_value is not None:
             converted_status = self._convert_status_to_enum(status_value)
-
             if converted_status is not None:
-                # Use converted enum value - map to the correct field name
-                if "status" in state:
-                    state["status"] = converted_status
-                if "status_" in state:
-                    state["status_"] = converted_status
-                # Also ensure the mapped field gets the converted value
-                state["status_"] = converted_status
-            else:
-                # Remove invalid status values to prevent validation errors
-                state.pop("status", None)
-                state.pop("status_", None)
+                self.status_ = converted_status
 
-        # Call parent update method
-        super().update_from_state(state)
+        # Handle mode
+        if "mode_" in state:
+            mode_data = state["mode_"]
+            if isinstance(mode_data, dict):
+                self.mode_ = TemperatureControlMode(eco=mode_data.get("eco", False))
+            elif isinstance(mode_data, TemperatureControlMode):
+                self.mode_ = mode_data
