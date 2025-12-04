@@ -11,6 +11,7 @@ import logging
 import threading
 import time
 import urllib.parse
+import uuid
 from concurrent.futures import Future
 from datetime import datetime
 from typing import Any, Callable, Dict, Optional
@@ -249,7 +250,6 @@ class MqttTransporter(AbstractTransporter):
         # Connection state
         self._client: Optional[mqtt5.Client] = None
         self._connected = False
-        self._client_id = f"ha-{monitor_id}-{int(time.time())}"
         self._is_refreshing_token = False
         self._state_lock = threading.RLock()
 
@@ -307,6 +307,10 @@ class MqttTransporter(AbstractTransporter):
     def _do_connect(self, **kwargs):
         """Internal connection logic."""
         try:
+            # Generate a new unique client ID for each connection attempt
+            # This prevents "Duplicate ClientId" errors when reconnecting
+            client_id = f"ha-{self._monitor_id}-{uuid.uuid4().hex}"
+            
             # Parse WebSocket URL for custom authorizer
             endpoint, auth_params = self._parse_websocket_url(self._broker_url)
 
@@ -319,7 +323,7 @@ class MqttTransporter(AbstractTransporter):
                 auth_token_key_name="token",
                 auth_token_value=auth_params["token"],
                 auth_authorizer_signature=auth_params["signature"],
-                client_id=self._client_id,
+                client_id=client_id,
                 clean_start=kwargs.get("clean_start", True),
                 keep_alive_secs=kwargs.get("keep_alive_secs", 30),
                 on_lifecycle_connection_success=self._on_connection_success,
@@ -329,7 +333,7 @@ class MqttTransporter(AbstractTransporter):
             )
 
             logger.info(
-                f"Connecting to AWS IoT at {endpoint} with client ID: {self._client_id}"
+                f"Connecting to AWS IoT at {endpoint} with client ID: {client_id}"
             )
             self._client.start()
 
