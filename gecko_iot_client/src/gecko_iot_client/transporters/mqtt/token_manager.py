@@ -42,8 +42,14 @@ class TokenManager:
             payload_bytes = base64.urlsafe_b64decode(payload_part)
             payload_json = json.loads(payload_bytes)
 
-            exp_timestamp = payload_json.get("exp")
+            # Check for expiry timestamp (support both standard 'exp' and Gecko's 'expiresAt')
+            exp_timestamp = payload_json.get("exp") or payload_json.get("expiresAt")
+            
             if exp_timestamp:
+                # Handle milliseconds (if value is very large, it's likely in milliseconds)
+                if exp_timestamp > 10000000000:  # Timestamp is in milliseconds
+                    exp_timestamp = exp_timestamp / 1000.0
+                    
                 self._token_expiry = datetime.fromtimestamp(exp_timestamp)
                 self._current_token = token
                 logger.info(f"Token expires at: {self._token_expiry}")

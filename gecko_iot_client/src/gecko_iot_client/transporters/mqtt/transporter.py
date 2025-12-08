@@ -148,6 +148,25 @@ class MqttTransporter(AbstractTransporter):
         """Check if connected to broker."""
         return self._mqtt_client.is_connected()
 
+    def update_broker_url(self, new_broker_url: str) -> None:
+        """
+        Update broker URL with a fresh token.
+        
+        This is useful when reusing an existing connection that needs a token refresh.
+        The method updates the broker URL and token manager without disconnecting.
+        
+        Args:
+            new_broker_url: New WebSocket URL with fresh JWT token
+        """
+        if not new_broker_url:
+            logger.warning("Attempted to update with empty broker URL")
+            return
+            
+        logger.info("Updating broker URL with fresh token")
+        self._broker_url = new_broker_url
+        self._token_manager.update_broker_url(new_broker_url)
+        logger.info(f"Token expiry updated to: {self._token_manager.expiry}")
+
     def load_configuration(self, timeout: float = 30.0):
         """Load configuration from AWS IoT."""
         if not self._mqtt_client.is_connected():
