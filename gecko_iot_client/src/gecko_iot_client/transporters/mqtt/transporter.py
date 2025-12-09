@@ -536,6 +536,23 @@ class MqttTransporter(AbstractTransporter):
         """Handle MQTT connection status changes."""
         logger.info(f"MQTT connection status changed: {connected}")
         
+        # Check if we're in the middle of a token refresh
+        with self._state_lock:
+            is_refreshing = self._is_refreshing_token
+        
+        # Suppress connectivity callbacks during token refresh to prevent
+        # entities from flickering unavailable during the brief disconnect/reconnect
+        if is_refreshing:
+            logger.debug("Suppressing connectivity callback during token refresh")
+            # Still handle reconnection logic, just don't notify external callbacks
+            if connected:
+                # Reset reconnection handler on successful connection
+                self._reconnection_handler.on_success()
+                # Clear subscription state to force re-setup after reconnection
+                with self._state_lock:
+                    self._subscriptions_setup = False
+            return
+        
         if connected:
             # Reset reconnection handler on successful connection
             self._reconnection_handler.on_success()
