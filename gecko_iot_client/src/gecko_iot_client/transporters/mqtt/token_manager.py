@@ -30,31 +30,38 @@ class TokenManager:
             if not token:
                 return
 
-            # Decode JWT payload (second part of token)
+            # Extract payload part based on token format
+            # Standard JWT: header.payload.signature (use middle part)
+            # Gecko format: base64-encoded JSON (use entire token)
             parts = token.split(".")
-            if len(parts) < 2:
-                logger.warning("Invalid JWT token format")
+            
+            if len(parts) == 3:
+                payload_part = parts[1]  # Standard JWT
+            elif len(parts) == 1:
+                payload_part = parts[0]  # Gecko simple format
+            else:
+                logger.warning(f"Unexpected token format with {len(parts)} parts (expected 1 or 3)")
                 return
 
-            # Decode payload with padding
-            payload_part = parts[1]
-            payload_part += "=" * (4 - len(payload_part) % 4)
-            payload_bytes = base64.urlsafe_b64decode(payload_part)
-            payload_json = json.loads(payload_bytes)
+            # Decode base64 payload (add padding if needed)
+            padding = (4 - len(payload_part) % 4) % 4
+            payload_bytes = base64.urlsafe_b64decode(payload_part + "=" * padding)
+            payload = json.loads(payload_bytes)
 
-            # Check for expiry timestamp (support both standard 'exp' and Gecko's 'expiresAt')
-            exp_timestamp = payload_json.get("exp") or payload_json.get("expiresAt")
+            # Extract expiry timestamp (supports both 'exp' and 'expiresAt' claims)
+            exp_timestamp = payload.get("exp") or payload.get("expiresAt")
             
-            if exp_timestamp:
-                # Handle milliseconds (if value is very large, it's likely in milliseconds)
-                if exp_timestamp > 10000000000:  # Timestamp is in milliseconds
-                    exp_timestamp = exp_timestamp / 1000.0
-                    
-                self._token_expiry = datetime.fromtimestamp(exp_timestamp)
-                self._current_token = token
-                logger.info(f"Token expires at: {self._token_expiry}")
-            else:
-                logger.warning("JWT token does not contain expiry claim")
+            if not exp_timestamp:
+                logger.warning("Token does not contain 'exp' or 'expiresAt' claim")
+                return
+                
+            # Convert to seconds if timestamp is in milliseconds
+            if exp_timestamp > 10_000_000_000:
+                exp_timestamp /= 1000.0
+                
+            self._token_expiry = datetime.fromtimestamp(exp_timestamp)
+            self._current_token = token
+            logger.info(f"Token expiry: {self._token_expiry}")
 
         except Exception as e:
             logger.warning(f"Failed to parse token expiry: {e}")

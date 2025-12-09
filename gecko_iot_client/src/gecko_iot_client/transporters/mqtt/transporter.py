@@ -11,6 +11,7 @@ import logging
 import threading
 import time
 import uuid
+from datetime import datetime
 from concurrent.futures import Future
 from typing import Any, Callable, Dict, Optional
 
@@ -67,6 +68,7 @@ class MqttTransporter(AbstractTransporter):
         self._broker_url = broker_url
         self._monitor_id = monitor_id
         self._token_refresh_callback = token_refresh_callback
+        self._token_refresh_buffer = token_refresh_buffer_seconds
 
         # Helper components
         self._token_manager = TokenManager(broker_url, token_refresh_buffer_seconds)
@@ -374,8 +376,8 @@ class MqttTransporter(AbstractTransporter):
                     logger.info("Token approaching expiry, initiating refresh...")
                     self._handle_token_refresh()
 
-                # Check every 30 seconds
-                self._monitor_stop_event.wait(30)
+                # Check every 10 seconds for more responsive refresh
+                self._monitor_stop_event.wait(10)
 
             except Exception as e:
                 logger.error(f"Error in expiry monitoring: {e}")
@@ -395,10 +397,19 @@ class MqttTransporter(AbstractTransporter):
             self._is_refreshing_token = True
         
         try:
-            logger.info("Refreshing token and reconnecting...")
+            # Log timing information
+            expiry = self._token_manager.expiry
+            if expiry:
+                time_to_expiry = (expiry - datetime.now()).total_seconds()
+                logger.info(f"Refreshing token ({time_to_expiry:.1f}s until expiry)...")
+            else:
+                logger.info("Refreshing token...")
 
-            # Get new broker URL with fresh token
+            # Get new broker URL with fresh token (track callback duration)
+            callback_start = datetime.now()
             new_broker_url = self._token_refresh_callback(self._monitor_id)
+            callback_duration = (datetime.now() - callback_start).total_seconds()
+            logger.info(f"Token refresh callback completed in {callback_duration:.1f}s")
             if not new_broker_url:
                 logger.error("Token refresh callback returned empty URL")
                 with self._state_lock:
@@ -406,30 +417,48 @@ class MqttTransporter(AbstractTransporter):
                 self._schedule_reconnect()
                 return
 
-            # Stop the old client
-            logger.info("Stopping old MQTT client for token refresh...")
-            self._mqtt_client.stop_for_refresh()
-
             # Update broker URL and token expiry
+            old_broker_url = self._broker_url
             self._broker_url = new_broker_url
             self._token_manager.update_broker_url(new_broker_url)
+            
+            # Reset reconnection counter - fresh token means fresh start
+            self._reconnection_handler.on_success()
+            logger.info("Token updated, establishing new connection...")
 
-            # Clear subscription state since we're reconnecting
-            with self._state_lock:
-                self._subscriptions_setup = False
-
-            # Attempt to reconnect
+            # Attempt to connect with new token
+            # Strategy: Create new connection FIRST, then let old one naturally close
+            # This minimizes downtime for entity availability
             try:
                 client_id = f"ha-{self._monitor_id}-{uuid.uuid4().hex}"
+                
+                # Save old client to close after new connection succeeds
+                old_client = self._mqtt_client._client if hasattr(self._mqtt_client, '_client') else None
+                
+                # Establish new connection with fresh token
+                # The new connection will be ready before we close the old one
                 self._mqtt_client.connect(
                     broker_url=self._broker_url,
                     client_id=client_id
                 )
                 
-                # Clear intentional disconnect flag after successful reconnection
+                # Now that new connection is established, clean up old client
+                # This happens AFTER the new connection is ready
+                if old_client:
+                    try:
+                        logger.debug("Closing old MQTT connection after establishing new one")
+                        old_client.stop()
+                    except Exception as e:
+                        logger.debug(f"Error closing old client (expected): {e}")
+                
+                # Clear subscription state since we need to re-subscribe with new connection
+                with self._state_lock:
+                    self._subscriptions_setup = False
+                
+                # Clear intentional disconnect flag
                 self._mqtt_client.clear_intentional_disconnect_flag()
                 
-                logger.info("Successfully refreshed token and reconnected")
+                logger.info("Successfully refreshed token with minimal downtime")
                 self._reconnection_handler.on_success()
                 
                 with self._state_lock:
@@ -437,6 +466,8 @@ class MqttTransporter(AbstractTransporter):
                     
             except Exception as e:
                 logger.error(f"Reconnection after token refresh failed: {e}")
+                # Restore old broker URL on failure
+                self._broker_url = old_broker_url
                 with self._state_lock:
                     self._is_refreshing_token = False
                 self._schedule_reconnect()
@@ -450,7 +481,23 @@ class MqttTransporter(AbstractTransporter):
     def _schedule_reconnect(self):
         """Schedule reconnection with exponential backoff."""
         if not self._reconnection_handler.should_attempt():
-            logger.error("Max reconnection attempts reached, giving up")
+            logger.warning(
+                "Max reconnection attempts reached, will retry after cooldown period. "
+                "If this persists, token may be expired - forcing token refresh."
+            )
+            # Reset counter and try token refresh if available
+            self._reconnection_handler.on_success()
+            
+            if self._token_refresh_callback:
+                # Force a token refresh after cooldown
+                def delayed_refresh():
+                    time.sleep(300)  # 5 minute cooldown
+                    if not self._monitor_stop_event.is_set():
+                        logger.info("Cooldown period ended, forcing token refresh")
+                        self._handle_token_refresh()
+                
+                refresh_thread = threading.Thread(target=delayed_refresh, daemon=True)
+                refresh_thread.start()
             return
 
         delay = self._reconnection_handler.get_delay()

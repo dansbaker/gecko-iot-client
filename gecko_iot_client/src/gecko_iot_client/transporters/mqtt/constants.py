@@ -4,7 +4,7 @@
 NOT_CONNECTED_ERROR = "Not connected"
 
 # Token refresh
-DEFAULT_TOKEN_REFRESH_BUFFER = 300  # 5 minutes before expiry
+DEFAULT_TOKEN_REFRESH_BUFFER = 600  # 10 minutes before expiry (safer margin)
 
 # Reconnection
 MAX_RECONNECT_ATTEMPTS = 5

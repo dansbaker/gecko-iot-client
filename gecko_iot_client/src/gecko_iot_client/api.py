@@ -17,10 +17,14 @@ class GeckoApiClient(ABC):
 
     def __init__(
         self,
-        websession: ClientSession
+        websession: ClientSession,
+        api_url: str = API_BASE_URL,
+        auth0_url: str = AUTH0_BASE_URL,
     ) -> None:
         """Initialize Gecko auth."""
         self.websession = websession
+        self.api_url = api_url
+        self.auth0_url = auth0_url
 
     @abstractmethod
     async def async_get_access_token(self) -> str:
@@ -32,7 +36,7 @@ class GeckoApiClient(ABC):
         headers = {"Authorization": f"Bearer {token}"}
         
         # Get from Auth0 userinfo
-        url = f"{AUTH0_BASE_URL}/userinfo"
+        url = f"{self.auth0_url}/userinfo"
         async with self.websession.get(url, headers=headers) as response:
             response.raise_for_status()
             payload = await response.json()
@@ -51,7 +55,7 @@ class GeckoApiClient(ABC):
         headers = kwargs.pop("headers", {})
         headers["Authorization"] = f"Bearer {access_token}"
         
-        url = f"{API_BASE_URL}{endpoint}"
+        url = f"{self.api_url}{endpoint}"
         _LOGGER.debug("Making %s request to %s", method, url)
         
         async with self.websession.request(method, url, headers=headers, **kwargs) as response:
