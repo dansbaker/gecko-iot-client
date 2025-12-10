@@ -4,7 +4,7 @@ Import this module to ensure all zone types are available for factory creation.
 """
 
 from .abstract_zone import AbstractZone, ZoneType
-from .flow_zone import FlowZone, FlowZoneInitiator
+from .flow_zone import FlowZone, FlowZoneInitiator, FlowZoneType
 from .lighting_zone import RGB, LightingZone
 from .temperature_control_zone import (
     TemperatureControlMode,
@@ -21,6 +21,7 @@ __all__ = [
     "TemperatureControlMode",
     "FlowZone",
     "FlowZoneInitiator",
+    "FlowZoneType",
     "LightingZone",
     "RGB",
 ]

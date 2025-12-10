@@ -43,6 +43,32 @@ class FlowZonePreset:
     speed: float
 
 
+class FlowZoneType(Enum):
+    FLOW_ZONE = "flow_zone"
+    WATERFALL_ZONE = "waterfall_zone"
+    BLOWER_ZONE = "blower_zone"
+
+
+@dataclass
+class FlowZoneTypeProperties:
+    """Properties for different flow zone types."""
+    format_name: callable
+
+
+# Type properties mapping zone types to their characteristics
+FLOW_ZONE_TYPE_PROPERTIES: Dict[FlowZoneType, FlowZoneTypeProperties] = {
+    FlowZoneType.WATERFALL_ZONE: FlowZoneTypeProperties(
+        format_name=lambda zone_id: "Waterfall",
+    ),
+    FlowZoneType.BLOWER_ZONE: FlowZoneTypeProperties(
+        format_name=lambda zone_id: "Blower",
+    ),
+    FlowZoneType.FLOW_ZONE: FlowZoneTypeProperties(
+        format_name=lambda zone_id: f"Pump {zone_id}",
+    ),
+}
+
+
 @AbstractZone.register_zone_type(ZoneType.FLOW_ZONE)
 class FlowZone(AbstractZone):
     """State representation for flow zone v1 with validation"""
@@ -51,7 +77,10 @@ class FlowZone(AbstractZone):
         """Initialize FlowZone with zone_id and config."""
         # Set default name if not provided
         if "name" not in config or config["name"] is None:
-            config["name"] = f"Pump {zone_id}"
+            # Determine the flow zone type and get its properties
+            flow_zone_type = self._determine_flow_zone_type(config)
+            type_props = FLOW_ZONE_TYPE_PROPERTIES[flow_zone_type]
+            config["name"] = type_props.format_name(zone_id)
 
         super().__init__(
             id=zone_id,
@@ -92,7 +121,21 @@ class FlowZone(AbstractZone):
     @property
     def initiators(self) -> Optional[List[FlowZoneInitiator]]:
         return self.initiators_
-
+    
+    @staticmethod
+    def _determine_flow_zone_type(config: FlowConfiguration) -> FlowZoneType:
+        """Determine the flow zone type from configuration."""
+        if config.get("waterfalls") and len(config.get("waterfalls", [])) > 0:
+            return FlowZoneType.WATERFALL_ZONE
+        if config.get("blowers") and len(config.get("blowers", [])) > 0:
+            return FlowZoneType.BLOWER_ZONE
+        return FlowZoneType.FLOW_ZONE
+    
+    @property
+    def type(self) -> FlowZoneType:
+        """Get the type of the flow zone."""
+        return self._determine_flow_zone_type(self.config)
+        
     @property
     def capabilities(self) -> List[FlowZoneCapabilities]:
         """Get the capabilities of the flow zone."""
