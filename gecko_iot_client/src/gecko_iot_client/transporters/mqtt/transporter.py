@@ -24,8 +24,7 @@ from .callback_registry import CallbackRegistry
 from .utils import parse_json_safely, complete_future_safely, notify_callbacks_safely
 from .constants import (
     NOT_CONNECTED_ERROR,
-    CONNECTION_TIMEOUT,
-    SUBSCRIPTION_SETTLE_DELAY,
+    CONNECTION_TIMEOUT
 )
 
 logger = logging.getLogger(__name__)
@@ -174,18 +173,21 @@ class MqttTransporter(AbstractTransporter):
         if not self._mqtt_client.is_connected():
             raise ConnectionError(NOT_CONNECTED_ERROR)
 
-        # Setup subscriptions if not already done
-        if not self._subscriptions_setup:
-            logger.info("Setting up subscriptions before loading configuration")
-            self._setup_subscriptions()
-
         if self._config_future and not self._config_future.done():
             logger.info("Configuration request already in progress")
             return
 
         logger.info(f"Loading configuration for monitor_id: {self._monitor_id}")
 
+        # Create future BEFORE setting up subscriptions to avoid race condition
+        # where response arrives before future exists
         self._config_future = Future()
+        
+        # Setup subscriptions if not already done
+        if not self._subscriptions_setup:
+            logger.info("Setting up subscriptions before loading configuration")
+            self._setup_subscriptions()
+
         topic = self._build_topic("config/get")
 
         try:
@@ -332,11 +334,7 @@ class MqttTransporter(AbstractTransporter):
         if successful_subscriptions > 0:
             self._subscriptions_setup = True
             logger.info(f"✅ Set up {successful_subscriptions}/{len(topics)} subscriptions")
-            
-            # Give AWS IoT time to process subscriptions
-            logger.info("⏳ Waiting for AWS IoT to fully establish subscriptions...")
-            time.sleep(SUBSCRIPTION_SETTLE_DELAY)
-            logger.info("Subscriptions should now be fully established")
+
         else:
             logger.error("Failed to set up any subscriptions")
             raise ConnectionError("Failed to establish subscriptions")
