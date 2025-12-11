@@ -324,17 +324,20 @@ class MqttClient:
                 else ""
             )
 
-            logger.debug(f"Received message on topic: {topic}")
+            logger.info(f"Received message on topic: {topic}")
+            logger.debug(f"Registered handlers: {list(self._topic_handlers.keys())}")
 
             # Try specific handler first
             handler = self._topic_handlers.get(topic)
             if handler:
+                logger.info(f"Routing message to registered handler for {topic}")
                 try:
                     handler(topic, payload)
                 except Exception as e:
                     logger.error(f"Handler error for {topic}: {e}")
             elif self._on_default_message_callback:
                 # Fall back to default callback
+                logger.info(f"Routing message to default callback for {topic}")
                 self._on_default_message_callback(topic, payload)
             else:
                 logger.warning(f"No handler registered for topic '{topic}'")
