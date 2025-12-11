@@ -102,7 +102,7 @@ class MqttTransporter(AbstractTransporter):
         self._monitor_stop_event.clear()
         
         if self._mqtt_client.is_connected():
-            logger.info("Already connected")
+            logger.debug("Already connected")
             return
 
         # Check if token is already expired before attempting connection
@@ -163,10 +163,10 @@ class MqttTransporter(AbstractTransporter):
             logger.warning("Attempted to update with empty broker URL")
             return
             
-        logger.info("Updating broker URL with fresh token")
+        logger.debug("Updating broker URL with fresh token")
         self._broker_url = new_broker_url
         self._token_manager.update_broker_url(new_broker_url)
-        logger.info(f"Token expiry updated to: {self._token_manager.expiry}")
+        logger.debug(f"Token expiry updated to: {self._token_manager.expiry}")
 
     def load_configuration(self, timeout: float = 30.0):
         """Load configuration from AWS IoT."""
@@ -174,10 +174,10 @@ class MqttTransporter(AbstractTransporter):
             raise ConnectionError(NOT_CONNECTED_ERROR)
 
         if self._config_future and not self._config_future.done():
-            logger.info("Configuration request already in progress")
+            logger.debug("Configuration request already in progress")
             return
 
-        logger.info(f"Loading configuration for monitor_id: {self._monitor_id}")
+        logger.debug(f"Loading configuration for monitor_id: {self._monitor_id}")
 
         # Create future BEFORE setting up subscriptions to avoid race condition
         # where response arrives before future exists
@@ -185,28 +185,28 @@ class MqttTransporter(AbstractTransporter):
         
         # Setup subscriptions if not already done
         if not self._subscriptions_setup:
-            logger.info("Setting up subscriptions before loading configuration")
+            logger.debug("Setting up subscriptions before loading configuration")
             self._setup_subscriptions()
 
         topic = self._build_topic("config/get")
 
         try:
-            logger.info(f"📤 Publishing configuration request to: {topic}")
+            logger.debug(f"Publishing configuration request to: {topic}")
             publish_future = self._mqtt_client.publish(topic, "{}")
 
             # Wait for publish to complete
             try:
                 publish_future.result(timeout=5.0)
-                logger.info(f"✅ Configuration request successfully published to {topic}")
+                logger.debug("Configuration request published")
             except Exception as e:
                 logger.error(f"Failed to publish configuration request: {e}")
                 raise ConfigurationError(f"Failed to publish config request: {e}")
 
-            logger.info(f"⏰ Waiting for configuration response (timeout: {timeout} seconds)...")
+            logger.debug(f"Waiting for configuration response (timeout: {timeout}s)")
 
             # Wait for response
             result = self._config_future.result(timeout=timeout)
-            logger.info("Configuration loaded successfully")
+            logger.debug("Configuration loaded successfully")
             return result
 
         except Exception as e:
@@ -224,17 +224,17 @@ class MqttTransporter(AbstractTransporter):
             self._setup_subscriptions()
 
         if self._state_future and not self._state_future.done():
-            logger.info("State request already in progress")
+            logger.debug("State request already in progress")
             return
 
-        logger.info(f"Loading state for monitor_id: {self._monitor_id}")
+        logger.debug(f"Loading state for monitor_id: {self._monitor_id}")
 
         self._state_future = Future()
         topic = self._build_topic("shadow/name/state/get")
 
         try:
             self._mqtt_client.publish(topic, "{}")
-            logger.info(f"State request sent to {topic}")
+            logger.debug("State request sent")
 
         except Exception as e:
             self._state_future = None
@@ -298,7 +298,7 @@ class MqttTransporter(AbstractTransporter):
             if new_broker_url:
                 self._broker_url = new_broker_url
                 self._token_manager.update_broker_url(new_broker_url)
-                logger.info("Token refreshed successfully before connection")
+                logger.debug("Token refreshed successfully before connection")
             else:
                 logger.error("Token refresh callback returned empty URL")
         except Exception as e:
@@ -307,10 +307,10 @@ class MqttTransporter(AbstractTransporter):
     def _setup_subscriptions(self):
         """Setup essential AWS IoT subscriptions."""
         if self._subscriptions_setup:
-            logger.info("Subscriptions already set up")
+            logger.debug("Subscriptions already set up")
             return
 
-        logger.info(f"Setting up subscriptions for monitor_id: {self._monitor_id}")
+        logger.debug(f"Setting up subscriptions for monitor_id: {self._monitor_id}")
 
         topics = [
             (self._build_topic("config/get/accepted"), self._on_config_response),
@@ -324,16 +324,15 @@ class MqttTransporter(AbstractTransporter):
         successful_subscriptions = 0
         for topic, handler in topics:
             try:
-                logger.info(f"🎯 Subscribing to: {topic}")
+                logger.debug(f"Subscribing to: {topic}")
                 self._mqtt_client.subscribe(topic, handler)
                 successful_subscriptions += 1
-                logger.info(f"Successfully subscribed to {topic}")
             except Exception as e:
                 logger.error(f"Failed to subscribe to {topic}: {e}")
 
         if successful_subscriptions > 0:
             self._subscriptions_setup = True
-            logger.info(f"✅ Set up {successful_subscriptions}/{len(topics)} subscriptions")
+            logger.debug(f"Set up {successful_subscriptions}/{len(topics)} subscriptions")
 
         else:
             logger.error("Failed to set up any subscriptions")
@@ -353,14 +352,14 @@ class MqttTransporter(AbstractTransporter):
             target=self._expiry_monitor_loop, daemon=True
         )
         self._monitor_thread.start()
-        logger.info("Started token expiry monitoring")
+        logger.debug("Started token expiry monitoring")
 
     def _stop_expiry_monitoring(self):
         """Stop token expiry monitoring."""
         if self._monitor_thread and self._monitor_thread.is_alive():
             self._monitor_stop_event.set()
             self._monitor_thread.join(timeout=5)
-            logger.info("Stopped token expiry monitoring")
+            logger.debug("Stopped token expiry monitoring")
 
     def _expiry_monitor_loop(self):
         """Background thread loop to monitor token expiry."""
@@ -407,7 +406,7 @@ class MqttTransporter(AbstractTransporter):
             callback_start = datetime.now()
             new_broker_url = self._token_refresh_callback(self._monitor_id)
             callback_duration = (datetime.now() - callback_start).total_seconds()
-            logger.info(f"Token refresh callback completed in {callback_duration:.1f}s")
+            logger.debug(f"Token refresh callback completed in {callback_duration:.1f}s")
             if not new_broker_url:
                 logger.error("Token refresh callback returned empty URL")
                 with self._state_lock:
@@ -422,7 +421,7 @@ class MqttTransporter(AbstractTransporter):
             
             # Reset reconnection counter - fresh token means fresh start
             self._reconnection_handler.on_success()
-            logger.info("Token updated, establishing new connection...")
+            logger.debug("Token updated, establishing new connection")
 
             # Attempt to connect with new token
             # Strategy: Create new connection FIRST, then let old one naturally close
@@ -456,7 +455,7 @@ class MqttTransporter(AbstractTransporter):
                 # Clear intentional disconnect flag
                 self._mqtt_client.clear_intentional_disconnect_flag()
                 
-                logger.info("Successfully refreshed token with minimal downtime")
+                logger.debug("Token refreshed with minimal downtime")
                 self._reconnection_handler.on_success()
                 
                 with self._state_lock:
@@ -501,7 +500,7 @@ class MqttTransporter(AbstractTransporter):
         delay = self._reconnection_handler.get_delay()
         attempt_num = self._reconnection_handler.on_attempt()
 
-        logger.info(f"Scheduling reconnection attempt {attempt_num} in {delay} seconds")
+        logger.debug(f"Scheduling reconnection attempt {attempt_num} in {delay}s")
 
         def delayed_reconnect():
             time.sleep(delay)
@@ -512,7 +511,7 @@ class MqttTransporter(AbstractTransporter):
                         broker_url=self._broker_url,
                         client_id=client_id
                     )
-                    logger.info("Reconnection successful")
+                    logger.debug("Reconnection successful")
                     self._reconnection_handler.on_success()
                     
                     # Clear subscription state to force re-setup
@@ -532,7 +531,7 @@ class MqttTransporter(AbstractTransporter):
 
     def _on_mqtt_connected(self, connected: bool):
         """Handle MQTT connection status changes."""
-        logger.info(f"MQTT connection status changed: {connected}")
+        logger.debug(f"MQTT connection status changed: {connected}")
         
         # Check if we're in the middle of a token refresh
         with self._state_lock:
@@ -581,12 +580,7 @@ class MqttTransporter(AbstractTransporter):
 
     def _on_config_response(self, topic: str, payload: str):
         """Handle configuration response."""
-        logger.info(f"Configuration response received on topic: {topic}")
-        logger.info(
-            f"Payload: {payload[:200]}..."
-            if len(payload) > 200
-            else f"Payload: {payload}"
-        )
+        logger.debug("Configuration response received")
 
         config = parse_json_safely(payload)
         if config:
@@ -614,7 +608,7 @@ class MqttTransporter(AbstractTransporter):
 
     def _on_state_response(self, topic: str, payload: str):
         """Handle state response."""
-        logger.info("State response received")
+        logger.debug("State response received")
         state = parse_json_safely(payload)
         
         if state:
@@ -640,13 +634,13 @@ class MqttTransporter(AbstractTransporter):
 
     def _on_state_document_update(self, topic: str, payload: str):
         """Handle state document update notifications."""
-        logger.info("State document update received from /shadow/name/state/update/documents")
+        logger.debug("State document update received")
         document = parse_json_safely(payload)
         
         if document:
             # Extract current state from document structure
             current_state = document.get("current", {}).get("state", {})
-            logger.info(f"Extracted state from document: {current_state}")
+            logger.debug("Extracted state from document")
             
             notify_callbacks_safely(
                 self._callback_registry.get_callbacks("state_update"),

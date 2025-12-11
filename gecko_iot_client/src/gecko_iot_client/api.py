@@ -9,7 +9,6 @@ from aiohttp import ClientSession
 from .const import API_BASE_URL, AUTH0_BASE_URL
 
 _LOGGER = logging.getLogger(__name__)
-_LOGGER.setLevel(logging.DEBUG)
 
 
 class GeckoApiClient(ABC):
@@ -40,7 +39,7 @@ class GeckoApiClient(ABC):
         async with self.websession.get(url, headers=headers) as response:
             response.raise_for_status()
             payload = await response.json()
-            _LOGGER.debug("Fetched user info: %s", payload)
+            _LOGGER.debug("Fetched user info from Auth0")
         try:
             return payload["sub"]
         except KeyError:
@@ -56,24 +55,20 @@ class GeckoApiClient(ABC):
         headers["Authorization"] = f"Bearer {access_token}"
         
         url = f"{self.api_url}{endpoint}"
-        _LOGGER.debug("Making %s request to %s", method, url)
+        _LOGGER.debug("Making %s request to %s", method, endpoint)
         
         async with self.websession.request(method, url, headers=headers, **kwargs) as response:
             response.raise_for_status()
             payload = await response.json()
-            _LOGGER.debug("Received response payload: %s", payload)
             return payload
 
     async def async_get_vessels(self, account_id: str) -> list[dict[str, Any]]:
         """Get available vessels for the account."""
-        _LOGGER.debug("Fetching vessels for account_id: %s", account_id)
+        _LOGGER.debug("Fetching vessels for account")
         data = await self.async_request("GET", f"/v4/accounts/{account_id}/vessels")
-        _LOGGER.debug("Fetched vessels data: %s", data)
-        _LOGGER.debug("Vessels data type: %s", type(data))
         
         # Check if data is a dict with a 'vessels' key or similar
         if isinstance(data, dict):
-            _LOGGER.debug("Response is a dict with keys: %s", data.keys())
             # Try common response wrapper patterns
             if "vessels" in data:
                 return data["vessels"]
@@ -86,9 +81,7 @@ class GeckoApiClient(ABC):
 
     async def async_get_user_info(self, user_id: str) -> dict[str, Any]:
 
-        access_token = await self.async_get_access_token()
-        _LOGGER.debug("Fetching user info for user_id: %s", user_id)
-        _LOGGER.debug("Using access token: %s", access_token)
+        _LOGGER.debug("Fetching user info")
         
         return await self.async_request("GET", f"/v2/user/{user_id}")
 
@@ -96,7 +89,7 @@ class GeckoApiClient(ABC):
     async def async_get_monitor_livestream(self, monitor_id: str) -> dict[str, Any]:
         """Get MQTT livestream connection details for a monitor."""
         livestream_data = await self.async_request("GET", f"/v1/monitors/{monitor_id}/iot/thirdPartySession")
-        _LOGGER.debug("Fetched livestream data for monitor %s", monitor_id)
+        _LOGGER.debug("Fetched livestream data")
         return livestream_data
 
 

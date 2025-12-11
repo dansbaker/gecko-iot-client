@@ -52,7 +52,7 @@ class ZoneConfigurationParser:
         self, zones_config: Dict[str, Any]
     ) -> Dict[ZoneType, List[AbstractZone]]:
         """Parse zones configuration into zone instances."""
-        logger.info("Parsing zones configuration")
+        logger.debug("Parsing zones configuration")
         zones: Dict[ZoneType, List[AbstractZone]] = {}
 
         # Check for unknown zone types first
@@ -63,7 +63,7 @@ class ZoneConfigurationParser:
         for zone_type, zone_class in self.ZONE_TYPE_TO_CLASS.items():
             zone_list = []
             zone_type_config = zones_config.get(zone_type.value, {})
-            logger.info(
+            logger.debug(
                 f"Processing zone type: {zone_type}, found {len(zone_type_config)} zones"
             )
             for zone_id, zone_config in zone_type_config.items():
@@ -92,14 +92,14 @@ class ZoneConfigurationParser:
                 zones[zone_type] = zone_list
 
         total_zones = sum(len(zlist) for zlist in zones.values())
-        logger.info(f"Parsed {total_zones} zones successfully")
+        logger.debug(f"Parsed {total_zones} zones")
         return zones
 
     def apply_state_to_zones(
         self, zones: Dict[ZoneType, List[AbstractZone]], state_data: Dict[str, Any]
     ) -> None:
         """Apply runtime state data to existing zone instances (not configuration)."""
-        logger.info("Applying runtime state data to zones")
+        logger.debug("Applying runtime state data to zones")
 
         # Extract the state from the shadow structure
         state = state_data.get("state", {})
@@ -110,19 +110,19 @@ class ZoneConfigurationParser:
         zones_state = reported_state.get("zones", {}) if reported_state else {}
 
         if not zones_state and desired_state:
-            logger.info(
-                "No zones runtime state found in reported state, checking desired state as fallback"
+            logger.debug(
+                "No zones runtime state found in reported state, checking desired state"
             )
             zones_state = desired_state.get("zones", {})
 
         if not zones_state:
-            logger.info(
-                "No zones runtime state found in either reported or desired state data"
+            logger.debug(
+                "No zones runtime state found"
             )
             return
 
-        logger.info(
-            f"Found zones state data with {len(zones_state)} zone type(s): {list(zones_state.keys())}"
+        logger.debug(
+            f"Found zones state data with {len(zones_state)} zone type(s)"
         )
 
         updated_count = 0
@@ -142,9 +142,8 @@ class ZoneConfigurationParser:
 
             # Get the zones of this type
             zone_list = zones[zone_type]
-            logger.info(
-                f"Processing {len(zones_of_type_state)} zone(s) of type {zone_type_key}, "
-                f"have {len(zone_list)} zones configured"
+            logger.debug(
+                f"Processing {len(zones_of_type_state)} zone(s) of type {zone_type_key}"
             )
 
             # Apply runtime state to each zone
@@ -168,4 +167,4 @@ class ZoneConfigurationParser:
                         f"Zone {zone_id} of type {zone_type_key} found in state but not in configured zones"
                     )
 
-        logger.info(f"Applied runtime state to {updated_count} zones")
+        logger.debug(f"Applied runtime state to {updated_count} zones")

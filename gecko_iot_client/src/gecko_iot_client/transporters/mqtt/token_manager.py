@@ -61,7 +61,7 @@ class TokenManager:
                 
             self._token_expiry = datetime.fromtimestamp(exp_timestamp)
             self._current_token = token
-            logger.info(f"Token expiry: {self._token_expiry}")
+            logger.debug(f"Token expiry: {self._token_expiry}")
 
         except Exception as e:
             logger.warning(f"Failed to parse token expiry: {e}")

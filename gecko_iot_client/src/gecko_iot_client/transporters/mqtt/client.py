@@ -79,7 +79,7 @@ class MqttClient:
         """
         with self._lock:
             if self._connected:
-                logger.info("Already connected")
+                logger.debug("Already connected")
                 return
             
             self._intentional_disconnect = False
@@ -106,7 +106,9 @@ class MqttClient:
                 on_publish_received=self._on_message_received,
             )
 
-            logger.info(f"Connecting to AWS IoT at {endpoint} with client ID: {client_id}")
+            logger.debug(f"Connecting to AWS IoT at {endpoint}")
+            if self._client is None:
+                raise ConfigurationError("Failed to create MQTT client (returned None)")
             self._client.start()
 
             # Wait for connection
@@ -116,7 +118,7 @@ class MqttClient:
             with self._lock:
                 self._connected = True
 
-            logger.info("Successfully connected to AWS IoT")
+            logger.debug("Connected to AWS IoT")
 
         except Exception as e:
             logger.error(f"Connection failed: {e}")
@@ -139,7 +141,7 @@ class MqttClient:
             client = self._client
 
         try:
-            logger.info("Disconnecting from AWS IoT...")
+            logger.debug("Disconnecting from AWS IoT")
             client.stop()
 
             # Wait for disconnection
@@ -152,7 +154,7 @@ class MqttClient:
                 self._client = None
                 self._topic_handlers.clear()
 
-            logger.info("Disconnected successfully")
+            logger.debug("Disconnected successfully")
 
         except Exception as e:
             logger.error(f"Disconnect error: {e}")
@@ -174,7 +176,7 @@ class MqttClient:
             client = self._client
 
         try:
-            logger.info("Stopping MQTT client for token refresh...")
+            logger.debug("Stopping MQTT client for token refresh")
             client.stop()
             
             with self._lock:
@@ -231,7 +233,7 @@ class MqttClient:
         future = self._client.subscribe(packet)
         try:
             future.result(timeout=SUBSCRIPTION_TIMEOUT)
-            logger.info(f"Successfully subscribed to {topic}")
+            logger.debug(f"Subscribed to {topic}")
         except Exception as e:
             logger.error(f"Subscription failed for {topic}: {e}")
             # Remove handler on failure
@@ -267,7 +269,7 @@ class MqttClient:
                 "signature": signature,
             }
 
-            logger.info(f"Parsed endpoint: {endpoint}, authorizer: {auth_name}")
+            logger.debug(f"Parsed endpoint: {endpoint}")
             return endpoint, auth_params
 
         except Exception as e:
@@ -286,7 +288,7 @@ class MqttClient:
 
     def _on_connection_success(self, connack_packet: mqtt5.LifecycleConnectSuccessData):
         """Handle successful connection."""
-        logger.info(f"Connection successful: {connack_packet}")
+        logger.debug("Connection successful")
         with self._lock:
             self._connected = True
         if self._on_connected_callback:
@@ -294,7 +296,7 @@ class MqttClient:
 
     def _on_connection_failure(self, connack_packet: mqtt5.LifecycleConnectFailureData):
         """Handle connection failure."""
-        logger.error(f"Connection failed: {connack_packet}")
+        logger.error("Connection failed")
         with self._lock:
             self._connected = False
         if self._on_connected_callback:
@@ -302,7 +304,7 @@ class MqttClient:
 
     def _on_disconnection(self, disconnect_packet: mqtt5.LifecycleDisconnectData):
         """Handle disconnection."""
-        logger.info(f"Disconnected: {disconnect_packet}")
+        logger.debug("Disconnected")
         
         with self._lock:
             was_intentional = self._intentional_disconnect
@@ -322,7 +324,7 @@ class MqttClient:
                 else ""
             )
 
-            logger.info(f"Received message on topic '{topic}': {payload[:100]}...")
+            logger.debug(f"Received message on topic: {topic}")
 
             # Try specific handler first
             handler = self._topic_handlers.get(topic)
