@@ -177,17 +177,21 @@ class MqttTransporter(AbstractTransporter):
             logger.debug("Configuration request already in progress")
             return
 
+        # Wait for subscriptions to be ready (set up by connection callback)
+        wait_start = time.time()
+        while not self._subscriptions_setup and (time.time() - wait_start) < timeout:
+            logger.debug("Waiting for subscriptions to be ready...")
+            time.sleep(0.1)
+        
+        if not self._subscriptions_setup:
+            raise ConfigurationError("Subscriptions not ready within timeout")
+
         logger.debug(f"Loading configuration for monitor_id: {self._monitor_id}")
 
-        # Create future BEFORE setting up subscriptions to avoid race condition
+        # Create future BEFORE publishing request to avoid race condition
         # where response arrives before future exists
         self._config_future = Future()
         
-        # Setup subscriptions if not already done
-        if not self._subscriptions_setup:
-            logger.debug("Setting up subscriptions before loading configuration")
-            self._setup_subscriptions()
-
         topic = self._build_topic("config/get")
 
         try:
@@ -218,10 +222,6 @@ class MqttTransporter(AbstractTransporter):
         """Load state from AWS IoT shadow."""
         if not self._mqtt_client.is_connected():
             raise ConnectionError(NOT_CONNECTED_ERROR)
-
-        # Setup subscriptions if not already done
-        if not self._subscriptions_setup:
-            self._setup_subscriptions()
 
         if self._state_future and not self._state_future.done():
             logger.debug("State request already in progress")
@@ -424,29 +424,21 @@ class MqttTransporter(AbstractTransporter):
             logger.debug("Token updated, establishing new connection")
 
             # Attempt to connect with new token
-            # Strategy: Create new connection FIRST, then let old one naturally close
-            # This minimizes downtime for entity availability
+            # We need to disconnect first, then reconnect with fresh token
+            # Connectivity events are suppressed via _is_refreshing_token flag
             try:
                 client_id = f"ha-{self._monitor_id}-{uuid.uuid4().hex}"
                 
-                # Save old client to close after new connection succeeds
-                old_client = self._mqtt_client._client if hasattr(self._mqtt_client, '_client') else None
+                # Disconnect old connection (connectivity event will be suppressed)
+                if self._mqtt_client.is_connected():
+                    logger.debug("Disconnecting old connection before token refresh reconnect")
+                    self._mqtt_client.disconnect()
                 
                 # Establish new connection with fresh token
-                # The new connection will be ready before we close the old one
                 self._mqtt_client.connect(
                     broker_url=self._broker_url,
                     client_id=client_id
                 )
-                
-                # Now that new connection is established, clean up old client
-                # This happens AFTER the new connection is ready
-                if old_client:
-                    try:
-                        logger.debug("Closing old MQTT connection after establishing new one")
-                        old_client.stop()
-                    except Exception as e:
-                        logger.debug(f"Error closing old client (expected): {e}")
                 
                 # Clear subscription state since we need to re-subscribe with new connection
                 with self._state_lock:
@@ -537,26 +529,43 @@ class MqttTransporter(AbstractTransporter):
         with self._state_lock:
             is_refreshing = self._is_refreshing_token
         
-        # Suppress connectivity callbacks during token refresh to prevent
-        # entities from flickering unavailable during the brief disconnect/reconnect
-        if is_refreshing:
-            logger.debug("Suppressing connectivity callback during token refresh")
-            # Still handle reconnection logic, just don't notify external callbacks
-            if connected:
-                # Reset reconnection handler on successful connection
-                self._reconnection_handler.on_success()
-                # Clear subscription state to force re-setup after reconnection
-                with self._state_lock:
-                    self._subscriptions_setup = False
-            return
-        
         if connected:
             # Reset reconnection handler on successful connection
             self._reconnection_handler.on_success()
-            # Clear subscription state to force re-setup after reconnection
-            with self._state_lock:
-                self._subscriptions_setup = False
+            
+            # Schedule subscription setup and state loading in a background thread
+            # to avoid blocking the lifecycle callback and allow connection to stabilize
+            def setup_after_connection():
+                # Brief delay to ensure MQTT client is fully ready for subscriptions
+                time.sleep(0.5)
+                
+                # Always setup subscriptions after connection
+                logger.debug("Setting up subscriptions after connection")
+                with self._state_lock:
+                    self._subscriptions_setup = False
+                
+                try:
+                    self._setup_subscriptions()
+                    
+                    # Load initial state after subscriptions are ready
+                    logger.debug("Loading initial state after connection")
+                    try:
+                        self.load_state()
+                    except Exception as e:
+                        logger.warning(f"Failed to load initial state after connection: {e}")
+                except Exception as e:
+                    logger.error(f"Failed to setup subscriptions after connection: {e}")
+            
+            setup_thread = threading.Thread(target=setup_after_connection, daemon=True)
+            setup_thread.start()
+            
+            # Suppress connectivity callbacks during token refresh to prevent
+            # entities from flickering unavailable during the brief disconnect/reconnect
+            if is_refreshing:
+                logger.debug("Suppressing connectivity callback during token refresh")
+                return
         else:
+            # Disconnection event
             # Check if we should attempt reconnection
             with self._state_lock:
                 is_refreshing = self._is_refreshing_token
@@ -570,6 +579,11 @@ class MqttTransporter(AbstractTransporter):
                 
                 logger.info("Unexpected disconnection, scheduling reconnection...")
                 self._schedule_reconnect()
+            
+            # Suppress disconnection callbacks during token refresh
+            if is_refreshing:
+                logger.debug("Suppressing disconnection callback during token refresh")
+                return
         
         # Notify connectivity callbacks
         self._callback_registry.notify("connectivity", connected)
