@@ -32,7 +32,7 @@ jobs:
     - name: Run tests and generate coverage
       run: |
         cd gecko_iot_client
-        pytest tests/ --cov=gecko_iot_client --cov-report=xml --cov-report=lcov --junitxml=test-results.xml
+        pytest tests/ --cov=src/gecko_iot_client --cov-report=xml:coverage.xml --cov-report=lcov --junitxml=test-results.xml
     
     - name: List files for debugging
       run: |
