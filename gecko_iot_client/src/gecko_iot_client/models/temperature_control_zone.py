@@ -1,3 +1,5 @@
+"""Temperature control zone models for Gecko IoT devices."""
+
 import logging
 from enum import Enum
 from typing import Any, Dict, Optional
@@ -8,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class TemperatureControlZoneStatus(Enum):
-    """Enum for temperature control zone status"""
+    """Enumeration of temperature control zone status values."""
 
     IDLE = 0
     HEATING = 1
@@ -22,6 +24,12 @@ class TemperatureControlZoneStatus(Enum):
 
     @property
     def is_heating(self) -> bool:
+        """
+        Check if the zone is currently in a heating state.
+
+        Returns:
+            True if status indicates heating is active
+        """
         return self in {
             TemperatureControlZoneStatus.HEATING,
             TemperatureControlZoneStatus.HEAT_PUMP_HEATING,
@@ -30,10 +38,15 @@ class TemperatureControlZoneStatus(Enum):
 
 
 class TemperatureControlMode:
-    """Temperature control mode configuration"""
+    """Temperature control mode configuration with eco mode support."""
 
     def __init__(self, eco: bool = False):
-        """Initialize temperature control mode."""
+        """
+        Initialize temperature control mode.
+
+        Args:
+            eco: Whether eco mode is enabled (default: False)
+        """
         self.eco = eco
 
 
@@ -42,7 +55,16 @@ class TemperatureControlZone(AbstractZone):
     """State representation for temperature control zone v1 with validation"""
 
     def __init__(self, zone_id: str, config: Dict[str, Any]):
-        """Initialize TemperatureControlZone with zone_id and config."""
+        """
+        Initialize TemperatureControlZone with zone_id and config.
+
+        Args:
+            zone_id: Unique identifier for the temperature control zone
+            config: Configuration dictionary with temperature control settings
+
+        Raises:
+            ValueError: If temperature values are outside valid range
+        """
         # Set default name if not provided
         if "name" not in config or config["name"] is None:
             config["name"] = f"Water Temperature {zone_id}"
@@ -75,7 +97,12 @@ class TemperatureControlZone(AbstractZone):
         self._validate_temperature_range()
 
     def _validate_temperature_range(self) -> None:
-        """Validate temperature values are within acceptable range (-50 to 100 Celsius)."""
+        """
+        Validate temperature values are within acceptable range (-50 to 100 Celsius).
+
+        Raises:
+            ValueError: If any temperature value is outside the valid range
+        """
         if self.temperature_ is not None and not (-50.0 <= self.temperature_ <= 100.0):
             raise ValueError(
                 f"Temperature {self.temperature_}°C is outside valid range (-50°C to 100°C)"
@@ -102,26 +129,32 @@ class TemperatureControlZone(AbstractZone):
 
     @property
     def status(self) -> Optional[TemperatureControlZoneStatus]:
+        """Get the current status of the temperature control zone."""
         return self.status_
 
     @property
     def temperature(self) -> Optional[float]:
+        """Get the current temperature in Celsius."""
         return self.temperature_
 
     @property
     def mode(self) -> Optional[TemperatureControlMode]:
+        """Get the current temperature control mode."""
         return self.mode_
 
     @property
     def target_temperature(self) -> Optional[float]:
+        """Get the target temperature set point in Celsius."""
         return self.set_point
 
     @property
     def min_temperature_set_point_c_value(self) -> Optional[float]:
+        """Get the minimum allowed temperature set point in Celsius."""
         return self.min_temperature_set_point_c
 
     @property
     def max_temperature_set_point_c_value(self) -> Optional[float]:
+        """Get the maximum allowed temperature set point in Celsius."""
         return self.max_temperature_set_point_c
 
     def __str__(self) -> str:
@@ -138,7 +171,15 @@ class TemperatureControlZone(AbstractZone):
         )
 
     def set_target_temperature(self, temperature: float) -> None:
-        """Set target temperature with validation against configured limits."""
+        """
+        Set target temperature with validation against configured limits.
+
+        Args:
+            temperature: Target temperature in Celsius
+
+        Raises:
+            ValueError: If temperature limits not configured or temperature outside range
+        """
         if (
             self.min_temperature_set_point_c is None
             or self.max_temperature_set_point_c is None
@@ -161,7 +202,12 @@ class TemperatureControlZone(AbstractZone):
         self._publish_desired_state({"setPoint": temperature})
 
     def get_temperature_state(self) -> Dict[str, Any]:
-        """Get the current temperature state as a simple dictionary."""
+        """
+        Get the current temperature state as a simple dictionary.
+
+        Returns:
+            Dictionary with current temperature, target, status, and eco mode
+        """
         return {
             "current_temperature": self.temperature_,
             "target_temperature": self.set_point,
@@ -170,12 +216,26 @@ class TemperatureControlZone(AbstractZone):
         }
 
     def _get_runtime_state_fields(self) -> set:
+        """
+        Get runtime state fields for temperature control zones.
+
+        Returns:
+            Set of field names that represent runtime state
+        """
         return {"temperature_", "set_point", "mode_", "status_"}
 
     def _convert_status_to_enum(
         self, status_value: Any
     ) -> Optional[TemperatureControlZoneStatus]:
-        """Convert status value to TemperatureControlZoneStatus enum."""
+        """
+        Convert status value to TemperatureControlZoneStatus enum.
+
+        Args:
+            status_value: Status value to convert (int, str, or enum)
+
+        Returns:
+            TemperatureControlZoneStatus enum or None if conversion fails
+        """
         if status_value is None:
             return None
 
@@ -210,7 +270,12 @@ class TemperatureControlZone(AbstractZone):
         return None
 
     def update_from_state(self, state: Dict[str, Any]) -> None:
-        """Update temperature control zone from runtime state."""
+        """
+        Update temperature control zone from runtime state.
+
+        Args:
+            state: State dictionary with current values
+        """
 
         if "temperature_" in state:
             self.temperature_ = state["temperature_"]

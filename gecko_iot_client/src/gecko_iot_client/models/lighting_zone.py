@@ -1,13 +1,26 @@
+"""Lighting zone models for Gecko IoT devices."""
+
 from typing import Any, Dict, Optional
 
 from .abstract_zone import AbstractZone, ZoneType
 
 
 class RGB:
-    """RGB color representation"""
+    """RGB color representation with optional intensity."""
 
     def __init__(self, r: int, g: int, b: int, i: Optional[int] = None):
-        """Initialize RGB color with validation."""
+        """
+        Initialize RGB color with validation.
+
+        Args:
+            r: Red component (0-255)
+            g: Green component (0-255)
+            b: Blue component (0-255)
+            i: Optional intensity component (0-255)
+
+        Raises:
+            ValueError: If any component is outside the 0-255 range
+        """
         if not (0 <= r <= 255):
             raise ValueError(f"Red component {r} must be between 0 and 255")
         if not (0 <= g <= 255):
@@ -23,7 +36,12 @@ class RGB:
         self.i = i
 
     def model_dump(self) -> Dict[str, Any]:
-        """Convert to dictionary (replaces Pydantic's model_dump)."""
+        """
+        Convert to dictionary (replaces Pydantic's model_dump).
+
+        Returns:
+            Dictionary with r, g, b, and optionally i keys
+        """
         result = {"r": self.r, "g": self.g, "b": self.b}
         if self.i is not None:
             result["i"] = self.i
@@ -35,7 +53,13 @@ class LightingZone(AbstractZone):
     """State representation for lighting zone v1 with validation"""
 
     def __init__(self, zone_id: str, config: Dict[str, Any]):
-        """Initialize LightingZone with zone_id and config."""
+        """
+        Initialize LightingZone with zone_id and config.
+
+        Args:
+            zone_id: Unique identifier for the lighting zone
+            config: Configuration dictionary with lighting zone settings
+        """
         # Set default name if not provided
         if "name" not in config or config["name"] is None:
             config["name"] = f"Light {zone_id}"
@@ -57,18 +81,39 @@ class LightingZone(AbstractZone):
             self._validate_effect_name(self.effect)
 
     def _validate_effect_name(self, effect: str) -> None:
-        """Validate effect name length."""
+        """
+        Validate effect name length.
+
+        Args:
+            effect: Effect name to validate
+
+        Raises:
+            ValueError: If effect name is not between 1 and 50 characters
+        """
         if len(effect) < 1 or len(effect) > 50:
             raise ValueError(
                 f"Effect name '{effect}' must be between 1 and 50 characters"
             )
 
     def _is_valid_effect_name(self, effect: str) -> bool:
-        """Check if effect name should be validated."""
+        """
+        Check if effect name should be validated.
+
+        Args:
+            effect: Effect name to check
+
+        Returns:
+            True if effect is a string that should be validated
+        """
         return isinstance(effect, str)
 
     def get_lighting_state(self) -> Dict[str, Any]:
-        """Get the current lighting state as a simple dictionary."""
+        """
+        Get the current lighting state as a simple dictionary.
+
+        Returns:
+            Dictionary with active status, color, and effect information
+        """
         return {
             "active": self.active,
             "color": self.rgbi.model_dump() if self.rgbi else None,
@@ -76,14 +121,30 @@ class LightingZone(AbstractZone):
         }
 
     def set_color(self, r: int, g: int, b: int, i: Optional[int] = None) -> None:
-        """Set lighting color."""
+        """
+        Set lighting color.
+
+        Args:
+            r: Red component (0-255)
+            g: Green component (0-255)
+            b: Blue component (0-255)
+            i: Optional intensity component (0-255)
+
+        Raises:
+            ValueError: If any component is outside the 0-255 range
+        """
         rgb_color = RGB(r=r, g=g, b=b, i=i)
         self.rgbi = rgb_color
         self.active = True
         self._publish_desired_state({"rgbi": rgb_color, "active": True})
 
     def _get_runtime_state_fields(self) -> set:
-        """Runtime state fields for lighting zones."""
+        """
+        Runtime state fields for lighting zones.
+
+        Returns:
+            Set of field names that represent runtime state
+        """
         return {"active", "rgbi", "effect"}
 
     def _get_field_mappings(self) -> Dict[str, str]:
@@ -106,7 +167,12 @@ class LightingZone(AbstractZone):
         }
 
     def update_from_state(self, state: Dict[str, Any]) -> None:
-        """Update lighting zone from runtime state with special handling for RGBI."""
+        """
+        Update lighting zone from runtime state with special handling for RGBI.
+
+        Args:
+            state: State dictionary with current values
+        """
         # Handle RGBI conversion if it's a list
         if "rgbi" in state:
             rgbi_value = state["rgbi"]
@@ -121,16 +187,24 @@ class LightingZone(AbstractZone):
         super().update_from_state(state)
 
     def set_effect(self, effect_name: str) -> None:
-        """Set lighting effect with validation."""
+        """
+        Set lighting effect with validation.
+
+        Args:
+            effect_name: Name of the effect to set (1-50 characters)
+
+        Raises:
+            ValueError: If effect name is not between 1 and 50 characters
+        """
         self._validate_effect_name(effect_name)
         self.effect = effect_name
         self.active = True
         self._publish_desired_state({"effect": effect_name, "active": True})
 
     def activate(self) -> None:
-        """Activate this zone."""
+        """Activate this lighting zone."""
         self._publish_desired_state({"active": True})
 
     def deactivate(self) -> None:
-        """Deactivate this zone."""
+        """Deactivate this lighting zone."""
         self._publish_desired_state({"active": False})

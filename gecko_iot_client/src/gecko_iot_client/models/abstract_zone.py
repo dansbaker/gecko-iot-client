@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 
 class ZoneType(Enum):
+    """Enumeration of available zone types in Gecko IoT devices."""
+
     FLOW_ZONE = "flow"
     TEMPERATURE_CONTROL_ZONE = "temperatureControl"
     LIGHTING_ZONE = "lighting"
@@ -20,7 +22,15 @@ class AbstractZone:
     def __init__(
         self, id: str, zone_type: ZoneType, config: Any, name: Optional[str] = None
     ):
-        """Initialize zone with required fields."""
+        """
+        Initialize zone with required fields.
+
+        Args:
+            id: Unique identifier for the zone
+            zone_type: Type of zone (flow, temperature control, or lighting)
+            config: Configuration dictionary for the zone
+            name: Optional human-readable name for the zone
+        """
         self.id = id
         self.name = name
         self.zone_type = zone_type
@@ -38,7 +48,12 @@ class AbstractZone:
         self._publish_callback = callback
 
     def _publish_desired_state(self, updates: Dict[str, Any]) -> None:
-        """Publish desired state updates via callback."""
+        """
+        Publish desired state updates via callback.
+
+        Args:
+            updates: Dictionary of state changes to publish
+        """
         if self._publish_callback:
             try:
                 # Call the callback with zone type, zone id, and updates
@@ -53,7 +68,12 @@ class AbstractZone:
     # Class registry for zone types
     @classmethod
     def _get_zone_registry(cls) -> Dict[ZoneType, type["AbstractZone"]]:
-        """Get the zone registry, creating it if it doesn't exist."""
+        """
+        Get the zone registry, creating it if it doesn't exist.
+
+        Returns:
+            Dictionary mapping zone types to their implementation classes
+        """
         if not hasattr(cls, "_registry"):
             cls._registry: Dict[ZoneType, type["AbstractZone"]] = {}
         return cls._registry
@@ -62,7 +82,15 @@ class AbstractZone:
     def register_zone_type(
         cls, zone_type: ZoneType
     ) -> Callable[[type["AbstractZone"]], type["AbstractZone"]]:
-        """Decorator to register a zone class with its type."""
+        """
+        Decorator to register a zone class with its type.
+
+        Args:
+            zone_type: The zone type to register
+
+        Returns:
+            Decorator function that registers the zone class
+        """
 
         def decorator(zone_class: type["AbstractZone"]) -> type["AbstractZone"]:
             registry = cls._get_zone_registry()
@@ -154,11 +182,25 @@ class AbstractZone:
                 setattr(self, mapped_field, field_value)
 
     def _get_runtime_state_fields(self) -> set:
-        """Get the set of fields that represent runtime state (should be overridden by subclasses)."""
+        """
+        Get the set of fields that represent runtime state.
+
+        Should be overridden by subclasses to specify which fields are runtime state.
+
+        Returns:
+            Set of field names that represent runtime state
+        """
         return set()
 
     def _get_field_mappings(self) -> Dict[str, str]:
-        """Get field name mappings (should be overridden by subclasses)."""
+        """
+        Get field name mappings for state updates.
+
+        Should be overridden by subclasses to map external field names to internal ones.
+
+        Returns:
+            Dictionary mapping external field names to internal field names
+        """
         return {}
 
     def to_config(self) -> Dict[str, Any]:
@@ -201,7 +243,15 @@ class AbstractZone:
 
 # Example usage and utility functions
 def create_zone_logger(zone_name: str) -> Callable[[str, Any, Any], None]:
-    """Create a logging callback for zone changes"""
+    """
+    Create a logging callback for zone changes.
+
+    Args:
+        zone_name: Name of the zone for logging
+
+    Returns:
+        Callback function that logs attribute changes
+    """
 
     def log_change(attribute: str, old_value: Any, new_value: Any) -> None:
         print(f"[{zone_name}] {attribute} changed: {old_value} -> {new_value}")
@@ -214,7 +264,17 @@ def create_validation_callback(
     validator: Callable[[Any], bool],
     error_message: str = "Invalid value",
 ) -> Callable[[str, Any, Any], None]:
-    """Create a validation callback for specific attributes"""
+    """
+    Create a validation callback for specific attributes.
+
+    Args:
+        attribute: Name of the attribute to validate
+        validator: Function that returns True if value is valid
+        error_message: Message to display on validation failure
+
+    Returns:
+        Callback function that validates attribute changes
+    """
 
     def validate_change(attr: str, old_value: Any, new_value: Any) -> None:
         if attr == attribute and new_value is not None:

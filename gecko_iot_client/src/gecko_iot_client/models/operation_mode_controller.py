@@ -17,7 +17,7 @@ class OperationModeController:
     """
 
     def __init__(self):
-        """Initialize operation mode controller."""
+        """Initialize operation mode controller with default values."""
         self.operation_mode: OperationMode = OperationMode.OTHER
         self._publish_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None
         self._logger = logging.getLogger(self.__class__.__name__)
@@ -34,7 +34,12 @@ class OperationModeController:
         self._publish_callback = callback
 
     def _publish_desired_state(self, updates: Dict[str, Any]) -> None:
-        """Publish desired state updates via callback."""
+        """
+        Publish desired state updates via callback.
+
+        Args:
+            updates: Dictionary of state changes to publish
+        """
         if self._publish_callback:
             try:
                 # Call the callback with feature name and updates
@@ -135,6 +140,9 @@ class OperationModeController:
 
         Args:
             mode: The operation mode to set
+
+        Raises:
+            ValueError: If mode is not an OperationMode enum
         """
         if not isinstance(mode, OperationMode):
             raise ValueError(f"Mode must be an OperationMode enum, got {type(mode)}")
@@ -148,6 +156,9 @@ class OperationModeController:
 
         Args:
             mode_name: String name of the mode (case-insensitive)
+
+        Raises:
+            ValueError: If mode name is not recognized
         """
         mode_name_upper = mode_name.upper()
 
@@ -174,7 +185,7 @@ class OperationModeController:
         Set the operation mode by numeric value.
 
         Args:
-            mode_value: Numeric value of the mode
+            mode_value: Numeric value of the mode (0-5)
         """
         mode = OperationMode.from_value(mode_value)
         self.set_mode(mode)
@@ -183,7 +194,12 @@ class OperationModeController:
         return f"OperationModeController(mode={self.operation_mode.name}, value={self.operation_mode.value})"
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary representation."""
+        """
+        Convert to dictionary representation.
+
+        Returns:
+            Dictionary with operation mode information
+        """
         return {
             "operation_mode": self.operation_mode.name,
             "operation_mode_value": self.operation_mode.value,

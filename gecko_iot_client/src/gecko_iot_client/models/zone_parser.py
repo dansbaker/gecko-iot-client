@@ -19,7 +19,15 @@ logger = logging.getLogger(__name__)
 
 
 def _extract_value_from_config(field_value: Any) -> Any:
-    """Extract actual value from config metadata like {'minimum': 0, 'maximum': 100}."""
+    """
+    Extract actual value from config metadata like {'minimum': 0, 'maximum': 100}.
+
+    Args:
+        field_value: Configuration value (can be dict with metadata or direct value)
+
+    Returns:
+        Extracted value or None if not found
+    """
     if isinstance(field_value, dict):
         # Look for actual value keys
         for key in ["value", "currentValue", "default", "initialValue"]:
@@ -33,7 +41,12 @@ def _extract_value_from_config(field_value: Any) -> Any:
 
 
 class ZoneConfigurationParser:
-    """Simple parser for zone configurations."""
+    """
+    Simple parser for zone configurations.
+
+    Converts raw zone configuration data into typed zone instances
+    and applies runtime state updates to existing zones.
+    """
 
     # Zone type mapping
     ZONE_TYPES = {
@@ -51,7 +64,15 @@ class ZoneConfigurationParser:
     def parse_zones_configuration(
         self, zones_config: Dict[str, Any]
     ) -> Dict[ZoneType, List[AbstractZone]]:
-        """Parse zones configuration into zone instances."""
+        """
+        Parse zones configuration into zone instances.
+
+        Args:
+            zones_config: Raw zone configuration dictionary
+
+        Returns:
+            Dictionary mapping zone types to lists of zone instances
+        """
         logger.info("Parsing zones configuration")
         zones: Dict[ZoneType, List[AbstractZone]] = {}
 
@@ -98,7 +119,13 @@ class ZoneConfigurationParser:
     def apply_state_to_zones(
         self, zones: Dict[ZoneType, List[AbstractZone]], state_data: Dict[str, Any]
     ) -> None:
-        """Apply runtime state data to existing zone instances (not configuration)."""
+        """
+        Apply runtime state data to existing zone instances (not configuration).
+
+        Args:
+            zones: Dictionary of existing zone instances organized by type
+            state_data: Device shadow state data containing runtime zone states
+        """
         logger.debug("Applying runtime state data to zones")
 
         # Extract the state from the shadow structure

@@ -1,3 +1,5 @@
+"""Flow zone models and configurations for Gecko IoT devices."""
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, TypedDict
@@ -5,16 +7,16 @@ from typing import Any, Dict, List, Optional, TypedDict
 from .abstract_zone import AbstractZone, ZoneType
 
 
-# Define a type for the speed configuration
 class SpeedConfig(TypedDict):
+    """Configuration for flow zone speed settings."""
+
     maximum: int
     minimum: int
     stepIncrement: int
 
-    # Define a type for the flow configuration
-
-
 class FlowConfiguration(TypedDict):
+    """Configuration dictionary for flow zones."""
+
     name: Optional[str]
     pumps: Optional[List[str]]
     speed: SpeedConfig
@@ -46,11 +48,15 @@ PRESET_NAMES = ["Low", "Medium", "High", "Max"]
 
 @dataclass
 class FlowZonePreset:
+    """Preset configuration for flow zone speeds."""
+
     name: str
     speed: float
 
 
 class FlowZoneType(Enum):
+    """Types of flow zones available in Gecko IoT devices."""
+
     FLOW_ZONE = "flow_zone"
     WATERFALL_ZONE = "waterfall_zone"
     BLOWER_ZONE = "blower_zone"
@@ -82,7 +88,13 @@ class FlowZone(AbstractZone):
     """State representation for flow zone v1 with validation"""
 
     def __init__(self, zone_id: str, config: FlowConfiguration):
-        """Initialize FlowZone with zone_id and config."""
+        """
+        Initialize FlowZone with zone_id and config.
+
+        Args:
+            zone_id: Unique identifier for the flow zone
+            config: Configuration dictionary with flow zone settings
+        """
         # Set default name if not provided
         if "name" not in config or config["name"] is None:
             # Determine the flow zone type and get its properties
@@ -109,14 +121,27 @@ class FlowZone(AbstractZone):
 
     @property
     def speed_config(self) -> Optional[SpeedConfig]:
-        """Get speed configuration if it exists and is properly structured."""
+        """
+        Get speed configuration if it exists and is properly structured.
+
+        Returns:
+            SpeedConfig dictionary or None if not available
+        """
         speed_value = self.config.get("speed")
         if isinstance(speed_value, dict):
             return speed_value  # type: ignore
         return None
 
     def _validate_speed(self, speed: float) -> None:
-        """Validate speed is within acceptable range."""
+        """
+        Validate speed is within acceptable range.
+
+        Args:
+            speed: Speed value to validate
+
+        Raises:
+            ValueError: If speed is outside the configured min/max range
+        """
         if self.speed_config:
             if not (
                 self.speed_config["minimum"] <= speed <= self.speed_config["maximum"]
@@ -129,11 +154,25 @@ class FlowZone(AbstractZone):
 
     @property
     def initiators(self) -> Optional[List[FlowZoneInitiator]]:
+        """
+        Get the list of active initiators for this flow zone.
+
+        Returns:
+            List of FlowZoneInitiator enums or None
+        """
         return self.initiators_
 
     @staticmethod
     def _determine_flow_zone_type(config: FlowConfiguration) -> FlowZoneType:
-        """Determine the flow zone type from configuration."""
+        """
+        Determine the flow zone type from configuration.
+
+        Args:
+            config: Flow zone configuration dictionary
+
+        Returns:
+            FlowZoneType enum value based on configuration
+        """
         if config.get("waterfalls") and len(config.get("waterfalls", [])) > 0:
             return FlowZoneType.WATERFALL_ZONE
         if config.get("blowers") and len(config.get("blowers", [])) > 0:
@@ -142,12 +181,22 @@ class FlowZone(AbstractZone):
 
     @property
     def type(self) -> FlowZoneType:
-        """Get the type of the flow zone."""
+        """
+        Get the type of the flow zone.
+
+        Returns:
+            FlowZoneType enum value
+        """
         return self._determine_flow_zone_type(self.config)
 
     @property
     def capabilities(self) -> List[FlowZoneCapabilities]:
-        """Get the capabilities of the flow zone."""
+        """
+        Get the capabilities of the flow zone.
+
+        Returns:
+            List of FlowZoneCapabilities enums
+        """
         capabilities = [
             FlowZoneCapabilities.SUPPORTS_TURN_ON,
             FlowZoneCapabilities.SUPPORTS_TURN_OFF,
@@ -160,7 +209,12 @@ class FlowZone(AbstractZone):
 
     @property
     def presets(self) -> List[FlowZonePreset]:
-        """Get the speed presets for the flow zone, if supported."""
+        """
+        Get the speed presets for the flow zone, if supported.
+
+        Returns:
+            List of FlowZonePreset objects with name and speed
+        """
         presets = []
         if (
             FlowZoneCapabilities.SUPPORTS_SPEED_PRESETS in self.capabilities
@@ -176,7 +230,12 @@ class FlowZone(AbstractZone):
         return presets
 
     def get_flow_state(self) -> Dict[str, Any]:
-        """Get the current flow state as a simple dictionary."""
+        """
+        Get the current flow state as a simple dictionary.
+
+        Returns:
+            Dictionary with active status, speed, and initiator information
+        """
         return {
             "active": self.active,
             "speed": self.speed,
@@ -184,7 +243,12 @@ class FlowZone(AbstractZone):
         }
 
     def _get_runtime_state_fields(self) -> set:
-        """Runtime state fields for flow zones."""
+        """
+        Runtime state fields for flow zones.
+
+        Returns:
+            Set of field names that represent runtime state
+        """
         return {"active", "speed"}
 
     def _get_field_mappings(self) -> Dict[str, str]:
@@ -203,7 +267,16 @@ class FlowZone(AbstractZone):
         }
 
     def set_speed(self, speed: float, active: Optional[bool] = True) -> None:
-        """Set flow speed with validation and optional active state."""
+        """
+        Set flow speed with validation and optional active state.
+
+        Args:
+            speed: Speed value to set (percentage)
+            active: Whether to activate the zone (default: True)
+
+        Raises:
+            ValueError: If speed is outside valid range
+        """
         self._validate_speed(speed)
         self.speed = speed
         if active is not None:
@@ -211,11 +284,16 @@ class FlowZone(AbstractZone):
         self._publish_desired_state({"speed": speed, "active": self.active})
 
     def activate(self) -> None:
-        """Activate this zone."""
+        """Activate this flow zone."""
         self._publish_desired_state({"active": True})
 
     def deactivate(self) -> None:
-        """Deactivate this zone."""
+        """
+        Deactivate this flow zone.
+
+        Raises:
+            RuntimeError: If zone has active non-user initiators
+        """
         non_user_initiators = self.initiators_ is not None and any(
             initiator != FlowZoneInitiator.USER_DEMAND.value
             for initiator in self.initiators_

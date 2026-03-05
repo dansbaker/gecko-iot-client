@@ -59,7 +59,12 @@ class MqttClient:
         self._topic_handlers: Dict[str, MessageHandler] = {}
 
     def is_connected(self) -> bool:
-        """Check if connected to broker."""
+        """
+        Check if connected to broker.
+
+        Returns:
+            True if currently connected to MQTT broker
+        """
         with self._lock:
             return self._connected
 
@@ -245,7 +250,18 @@ class MqttClient:
     # Internal methods
 
     def _parse_websocket_url(self, url: str) -> tuple:
-        """Parse WebSocket URL to extract AWS IoT connection parameters."""
+        """
+        Parse WebSocket URL to extract AWS IoT connection parameters.
+
+        Args:
+            url: WebSocket URL with embedded JWT token and auth params
+
+        Returns:
+            Tuple of (endpoint, auth_params dict)
+
+        Raises:
+            ConfigurationError: If URL is malformed or missing required parameters
+        """
         try:
             parsed_url = urllib.parse.urlparse(url)
             query_params = urllib.parse.parse_qs(parsed_url.query)
@@ -275,7 +291,15 @@ class MqttClient:
             raise ConfigurationError(f"Failed to parse WebSocket URL: {e}")
 
     def _wait_for_connection(self, timeout: int = 10) -> bool:
-        """Wait for connection establishment."""
+        """
+        Wait for connection establishment.
+
+        Args:
+            timeout: Maximum time to wait in seconds
+
+        Returns:
+            True if connected within timeout, False otherwise
+        """
         start_time = time.time()
         while time.time() - start_time < timeout:
             if self._connected:
@@ -286,7 +310,12 @@ class MqttClient:
     # Lifecycle callbacks
 
     def _on_connection_success(self, connack_packet: mqtt5.LifecycleConnectSuccessData):
-        """Handle successful connection."""
+        """
+        Handle successful connection.
+
+        Args:
+            connack_packet: Connection acknowledgment packet data
+        """
         logger.debug("Connection successful")
         with self._lock:
             self._connected = True
@@ -294,7 +323,12 @@ class MqttClient:
             self._on_connected_callback(True)
 
     def _on_connection_failure(self, connack_packet: mqtt5.LifecycleConnectFailureData):
-        """Handle connection failure."""
+        """
+        Handle connection failure.
+
+        Args:
+            connack_packet: Connection failure packet data
+        """
         logger.error("Connection failed")
         with self._lock:
             self._connected = False
@@ -302,7 +336,12 @@ class MqttClient:
             self._on_connected_callback(False)
 
     def _on_disconnection(self, disconnect_packet: mqtt5.LifecycleDisconnectData):
-        """Handle disconnection."""
+        """
+        Handle disconnection.
+
+        Args:
+            disconnect_packet: Disconnection packet data
+        """
         logger.debug("Disconnected")
 
         with self._lock:
@@ -314,7 +353,12 @@ class MqttClient:
             self._on_connected_callback(False)
 
     def _on_message_received(self, publish_data):
-        """Route incoming messages to handlers or default callback."""
+        """
+        Route incoming messages to handlers or default callback.
+
+        Args:
+            publish_data: Published message data from MQTT broker
+        """
         try:
             topic = publish_data.publish_packet.topic
             payload = (

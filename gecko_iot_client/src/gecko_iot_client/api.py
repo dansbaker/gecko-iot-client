@@ -20,17 +20,40 @@ class GeckoApiClient(ABC):
         api_url: str = API_BASE_URL,
         auth0_url: str = AUTH0_BASE_URL,
     ) -> None:
-        """Initialize Gecko auth."""
+        """
+        Initialize Gecko auth.
+
+        Args:
+            websession: aiohttp ClientSession for making HTTP requests
+            api_url: Base URL for Gecko API (default: production API)
+            auth0_url: Base URL for Auth0 authentication (default: production Auth0)
+        """
         self.websession = websession
         self.api_url = api_url
         self.auth0_url = auth0_url
 
     @abstractmethod
     async def async_get_access_token(self) -> str:
-        """Return a valid access token for the Gecko API."""
+        """
+        Return a valid access token for the Gecko API.
+
+        This method must be implemented by subclasses to provide
+        OAuth2 token management.
+
+        Returns:
+            Valid access token string
+        """
 
     async def async_get_user_id(self) -> dict[str, Any]:
-        """Get user information from Auth0 or Gecko API."""
+        """
+        Get user information from Auth0 or Gecko API.
+
+        Returns:
+            User ID (sub claim) from Auth0
+
+        Raises:
+            ValueError: If user ID not found in Auth0 response
+        """
         token = await self.async_get_access_token()
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -48,7 +71,20 @@ class GeckoApiClient(ABC):
             )
 
     async def async_request(self, method: str, endpoint: str, **kwargs: Any) -> Any:
-        """Make an authenticated request to the Gecko API."""
+        """
+        Make an authenticated request to the Gecko API.
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            endpoint: API endpoint path (e.g., "/v4/accounts/123/vessels")
+            **kwargs: Additional arguments to pass to aiohttp request
+
+        Returns:
+            JSON response from the API
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
         access_token = await self.async_get_access_token()
         headers = kwargs.pop("headers", {})
         headers["Authorization"] = f"Bearer {access_token}"
@@ -64,7 +100,15 @@ class GeckoApiClient(ABC):
             return payload
 
     async def async_get_vessels(self, account_id: str) -> list[dict[str, Any]]:
-        """Get available vessels for the account."""
+        """
+        Get available vessels for the account.
+
+        Args:
+            account_id: Account ID to fetch vessels for
+
+        Returns:
+            List of vessel dictionaries
+        """
         _LOGGER.debug("Fetching vessels for account")
         data = await self.async_request("GET", f"/v4/accounts/{account_id}/vessels")
 
@@ -81,13 +125,30 @@ class GeckoApiClient(ABC):
         return data if isinstance(data, list) else []
 
     async def async_get_user_info(self, user_id: str) -> dict[str, Any]:
+        """
+        Get user information from Gecko API.
+
+        Args:
+            user_id: User ID to fetch information for
+
+        Returns:
+            User information dictionary
+        """
 
         _LOGGER.debug("Fetching user info")
 
         return await self.async_request("GET", f"/v2/user/{user_id}")
 
     async def async_get_monitor_livestream(self, monitor_id: str) -> dict[str, Any]:
-        """Get MQTT livestream connection details for a monitor."""
+        """
+        Get MQTT livestream connection details for a monitor.
+
+        Args:
+            monitor_id: Monitor ID to get livestream details for
+
+        Returns:
+            Dictionary with MQTT connection details including endpoint and credentials
+        """
         livestream_data = await self.async_request(
             "GET", f"/v1/monitors/{monitor_id}/iot/thirdPartySession"
         )

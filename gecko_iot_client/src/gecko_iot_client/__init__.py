@@ -183,7 +183,12 @@ class GeckoIotClient:
         self.transporter.disconnect()
 
     def _on_transporter_connectivity_change(self, is_connected: bool):
-        """Handle transporter connectivity changes (transport-agnostic)."""
+        """
+        Handle transporter connectivity changes (transport-agnostic).
+
+        Args:
+            is_connected: True if transport is connected, False otherwise
+        """
         self._connectivity_status.transport_connected = is_connected
         self._logger.info(f"Transporter connectivity changed: {is_connected}")
 
@@ -193,7 +198,12 @@ class GeckoIotClient:
         )
 
     def _process_state_updates(self, state_data: Dict[str, Any]) -> None:
-        """Process all registered state handlers for the given state data."""
+        """
+        Process all registered state handlers for the given state data.
+
+        Args:
+            state_data: Device shadow state data to process
+        """
         for handler in self._state_handlers:
             status_obj = handler["status_obj"]
             event_channel = handler["event_channel"]
@@ -263,7 +273,12 @@ class GeckoIotClient:
         self._event_emitter.off(channel, callback)
 
     def _on_configuration_loaded(self, configuration):
-        """Handle configuration loading and zone parsing."""
+        """
+        Handle configuration loading and zone parsing.
+
+        Args:
+            configuration: Device configuration dictionary
+        """
         self._logger.info("Configuration loaded.")
         self._configuration = configuration
 
@@ -286,14 +301,24 @@ class GeckoIotClient:
             self._logger.error(f"Failed to load state: {e}")
 
     def _on_state_change(self, new_state):
-        """Handle state changes."""
+        """
+        Handle state changes.
+
+        Args:
+            new_state: New device state dictionary
+        """
         self._logger.debug(f"State changed to: {new_state}")
 
         # Process all state updates using unified handler (includes zone updates)
         self._process_state_updates(new_state)
 
     def _on_state_loaded(self, state_data):
-        """Handle state loading from AWS IoT Device Shadow."""
+        """
+        Handle state loading from AWS IoT Device Shadow.
+
+        Args:
+            state_data: Device shadow state data
+        """
         self._logger.info("State loaded from AWS IoT Device Shadow.")
         self._state = state_data
         self._logger.debug(f"State data: {state_data}")
@@ -336,8 +361,12 @@ class GeckoIotClient:
         Args:
             zone_type: The type of the zone
             zone_id: The zone ID to search for
+
         Returns:
             The zone with matching type and ID
+
+        Raises:
+            ValueError: If no zone found with the specified type and ID
         """
 
         zone = next(
@@ -444,7 +473,7 @@ class GeckoIotClient:
         Get a simple list of all zones with basic info.
 
         Returns:
-            List of dictionaries with zone information
+            List of dictionaries with zone information (id, name, type, has_control)
         """
         zones_info = []
         for zone_type, zone_list in self._zones.items():
