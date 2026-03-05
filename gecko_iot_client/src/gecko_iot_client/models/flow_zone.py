@@ -1,20 +1,24 @@
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, TypedDict
-from dataclasses import dataclass
 
 from .abstract_zone import AbstractZone, ZoneType
 
-    # Define a type for the speed configuration
+
+# Define a type for the speed configuration
 class SpeedConfig(TypedDict):
     maximum: int
     minimum: int
     stepIncrement: int
 
     # Define a type for the flow configuration
+
+
 class FlowConfiguration(TypedDict):
     name: Optional[str]
     pumps: Optional[List[str]]
     speed: SpeedConfig
+
 
 class FlowZoneCapabilities(Enum):
     """Enum for flow zone capabilities"""
@@ -23,6 +27,7 @@ class FlowZoneCapabilities(Enum):
     SUPPORTS_SPEED_PERCENTAGE = "supports_speed_percentage"
     SUPPORTS_TURN_ON = "supports_turn_on"
     SUPPORTS_TURN_OFF = "supports_turn_off"
+
 
 class FlowZoneInitiator(Enum):
     """Enum for flow zone initiators"""
@@ -35,7 +40,9 @@ class FlowZoneInitiator(Enum):
     COOLDOWN = "CD"
     HEAT_PUMP = "HTP"
 
+
 PRESET_NAMES = ["Low", "Medium", "High", "Max"]
+
 
 @dataclass
 class FlowZonePreset:
@@ -52,6 +59,7 @@ class FlowZoneType(Enum):
 @dataclass
 class FlowZoneTypeProperties:
     """Properties for different flow zone types."""
+
     format_name: callable
 
 
@@ -83,10 +91,7 @@ class FlowZone(AbstractZone):
             config["name"] = type_props.format_name(zone_id)
 
         super().__init__(
-            id=zone_id,
-            zone_type=ZoneType.FLOW_ZONE,
-            name=config["name"],
-            config=config
+            id=zone_id, zone_type=ZoneType.FLOW_ZONE, name=config["name"], config=config
         )
 
         # Initialize flow zone specific attributes from config
@@ -113,13 +118,19 @@ class FlowZone(AbstractZone):
     def _validate_speed(self, speed: float) -> None:
         """Validate speed is within acceptable range."""
         if self.speed_config:
-            if not (self.speed_config["minimum"] <= speed <= self.speed_config["maximum"]):
-                raise ValueError(f"Flow speed {speed}% must be between {self.speed_config['minimum']} and {self.speed_config['maximum']}")
+            if not (
+                self.speed_config["minimum"] <= speed <= self.speed_config["maximum"]
+            ):
+                min_val = self.speed_config["minimum"]
+                max_val = self.speed_config["maximum"]
+                raise ValueError(
+                    f"Flow speed {speed}% must be between {min_val} and {max_val}"
+                )
 
     @property
     def initiators(self) -> Optional[List[FlowZoneInitiator]]:
         return self.initiators_
-    
+
     @staticmethod
     def _determine_flow_zone_type(config: FlowConfiguration) -> FlowZoneType:
         """Determine the flow zone type from configuration."""
@@ -128,12 +139,12 @@ class FlowZone(AbstractZone):
         if config.get("blowers") and len(config.get("blowers", [])) > 0:
             return FlowZoneType.BLOWER_ZONE
         return FlowZoneType.FLOW_ZONE
-    
+
     @property
     def type(self) -> FlowZoneType:
         """Get the type of the flow zone."""
         return self._determine_flow_zone_type(self.config)
-        
+
     @property
     def capabilities(self) -> List[FlowZoneCapabilities]:
         """Get the capabilities of the flow zone."""
@@ -141,26 +152,29 @@ class FlowZone(AbstractZone):
             FlowZoneCapabilities.SUPPORTS_TURN_ON,
             FlowZoneCapabilities.SUPPORTS_TURN_OFF,
         ]
-        
+
         if self.speed_config and self.speed_config["stepIncrement"] != 0:
             capabilities.append(FlowZoneCapabilities.SUPPORTS_SPEED_PRESETS)
-        
+
         return capabilities
-    
+
     @property
     def presets(self) -> List[FlowZonePreset]:
         """Get the speed presets for the flow zone, if supported."""
         presets = []
-        if FlowZoneCapabilities.SUPPORTS_SPEED_PRESETS in self.capabilities and self.speed_config:
+        if (
+            FlowZoneCapabilities.SUPPORTS_SPEED_PRESETS in self.capabilities
+            and self.speed_config
+        ):
             step = self.speed_config["stepIncrement"]
             min_speed = self.speed_config["minimum"]
             max_speed = self.speed_config["maximum"]
             preset_speeds = list(range(min_speed, max_speed + 1, step))
             for i, speed in enumerate(preset_speeds):
-                name = PRESET_NAMES[i] if i < len(PRESET_NAMES) else f"Preset {i+1}"
                 name = PRESET_NAMES[i] if i < len(PRESET_NAMES) else f"Preset {i + 1}"
+                presets.append(FlowZonePreset(name=name, speed=speed))
         return presets
-    
+
     def get_flow_state(self) -> Dict[str, Any]:
         """Get the current flow state as a simple dictionary."""
         return {
@@ -202,11 +216,13 @@ class FlowZone(AbstractZone):
 
     def deactivate(self) -> None:
         """Deactivate this zone."""
-        non_user_initiators = (
-            self.initiators_ is not None and
-            any(initiator != FlowZoneInitiator.USER_DEMAND.value for initiator in self.initiators_)
+        non_user_initiators = self.initiators_ is not None and any(
+            initiator != FlowZoneInitiator.USER_DEMAND.value
+            for initiator in self.initiators_
         )
         if non_user_initiators:
-            raise RuntimeError("Cannot deactivate flow zone with active non-user initiators.")
-        
+            raise RuntimeError(
+                "Cannot deactivate flow zone with active non-user initiators."
+            )
+
         self._publish_desired_state({"active": False})

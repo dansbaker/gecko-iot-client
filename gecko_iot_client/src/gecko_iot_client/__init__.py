@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Callable, Dict, List
 
+from .api import GeckoApiClient
 from .models.connectivity import ConnectivityStatus
 from .models.events import EventChannel, EventEmitter
 from .models.operation_mode import OperationMode, OperationModeStatus
@@ -15,7 +16,6 @@ from .models.zone_types import (
 )
 from .transporters import AbstractTransporter
 from .transporters.exceptions import ConfigurationTimeoutError
-from .api import GeckoApiClient
 
 # Make key classes available at package level
 __all__ = [
@@ -202,7 +202,7 @@ class GeckoIotClient:
             if status_obj.update_from_state_data(state_data):
                 self._logger.info(log_formatter(status_obj))
                 self._event_emitter.emit(event_channel, status_obj)
-        
+
         # Apply state updates to zones
         if self._zones:
             try:

@@ -116,14 +116,10 @@ class ZoneConfigurationParser:
             zones_state = desired_state.get("zones", {})
 
         if not zones_state:
-            logger.debug(
-                "No zones runtime state found"
-            )
+            logger.debug("No zones runtime state found")
             return
 
-        logger.debug(
-            f"Found zones state data with {len(zones_state)} zone type(s)"
-        )
+        logger.debug(f"Found zones state data with {len(zones_state)} zone type(s)")
 
         updated_count = 0
 

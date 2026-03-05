@@ -3,7 +3,7 @@
 import json
 import logging
 from concurrent.futures import Future
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

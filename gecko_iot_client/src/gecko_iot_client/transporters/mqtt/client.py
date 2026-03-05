@@ -22,14 +22,14 @@ MessageHandler = Callable[[str, str], None]  # (topic, payload)
 class MqttClient:
     """
     Low-level MQTT client for AWS IoT Core.
-    
+
     Responsibilities:
     - Connection/disconnection to AWS IoT MQTT broker
     - Publishing messages
     - Subscribing to topics
     - Message routing to handlers
     - Connection lifecycle callbacks
-    
+
     This class handles pure MQTT protocol concerns without any
     Gecko-specific business logic.
     """
@@ -41,20 +41,20 @@ class MqttClient:
     ):
         """
         Initialize MQTT client.
-        
+
         Args:
             on_connected: Callback for connection status changes (bool: connected)
             on_message: Default callback for messages without specific handlers
         """
         self._on_connected_callback = on_connected
         self._on_default_message_callback = on_message
-        
+
         # MQTT client state
         self._client: Optional[mqtt5.Client] = None
         self._connected = False
         self._intentional_disconnect = False
         self._lock = threading.RLock()
-        
+
         # Topic handlers for message routing
         self._topic_handlers: Dict[str, MessageHandler] = {}
 
@@ -64,14 +64,11 @@ class MqttClient:
             return self._connected
 
     def connect(
-        self,
-        broker_url: str,
-        client_id: str,
-        timeout: int = CONNECTION_TIMEOUT
+        self, broker_url: str, client_id: str, timeout: int = CONNECTION_TIMEOUT
     ) -> None:
         """
         Connect to AWS IoT MQTT broker.
-        
+
         Args:
             broker_url: WebSocket URL with embedded JWT token and auth params
             client_id: Unique client identifier
@@ -81,7 +78,7 @@ class MqttClient:
             if self._connected:
                 logger.debug("Already connected")
                 return
-            
+
             self._intentional_disconnect = False
 
         try:
@@ -165,7 +162,7 @@ class MqttClient:
     def stop_for_refresh(self) -> None:
         """
         Stop client for token refresh (intentional disconnect).
-        
+
         This is different from disconnect() as it's specifically for
         token refresh scenarios and clears the intentional flag after.
         """
@@ -178,23 +175,25 @@ class MqttClient:
         try:
             logger.debug("Stopping MQTT client for token refresh")
             client.stop()
-            
+
             with self._lock:
                 self._client = None
                 self._connected = False
-                
+
         except Exception as e:
             logger.warning(f"Error stopping client for refresh: {e}")
 
-    def publish(self, topic: str, payload: str, timeout: float = PUBLISH_TIMEOUT) -> Future:
+    def publish(
+        self, topic: str, payload: str, timeout: float = PUBLISH_TIMEOUT
+    ) -> Future:
         """
         Publish message to a topic.
-        
+
         Args:
             topic: MQTT topic
             payload: Message payload (string)
             timeout: Publish timeout in seconds
-            
+
         Returns:
             Future for the publish operation
         """
@@ -202,9 +201,7 @@ class MqttClient:
             raise ConnectionError("Client not initialized")
 
         packet = mqtt5.PublishPacket(
-            topic=topic,
-            payload=payload.encode("utf-8"),
-            qos=mqtt5.QoS.AT_LEAST_ONCE
+            topic=topic, payload=payload.encode("utf-8"), qos=mqtt5.QoS.AT_LEAST_ONCE
         )
 
         return self._client.publish(packet)
@@ -212,7 +209,7 @@ class MqttClient:
     def subscribe(self, topic: str, handler: MessageHandler) -> None:
         """
         Subscribe to a topic with a message handler.
-        
+
         Args:
             topic: MQTT topic to subscribe to
             handler: Callback function(topic, payload)
@@ -259,7 +256,9 @@ class MqttClient:
             signature = query_params.get("x-amz-customauthorizer-signature", [None])[0]
 
             if not auth_name or not token or not signature:
-                raise ConfigurationError("Missing required custom authorizer parameters in URL")
+                raise ConfigurationError(
+                    "Missing required custom authorizer parameters in URL"
+                )
 
             signature = urllib.parse.unquote(signature)
 
@@ -305,11 +304,11 @@ class MqttClient:
     def _on_disconnection(self, disconnect_packet: mqtt5.LifecycleDisconnectData):
         """Handle disconnection."""
         logger.debug("Disconnected")
-        
+
         with self._lock:
             was_intentional = self._intentional_disconnect
             self._connected = False
-        
+
         # Only notify if it was unexpected
         if not was_intentional and self._on_connected_callback:
             self._on_connected_callback(False)

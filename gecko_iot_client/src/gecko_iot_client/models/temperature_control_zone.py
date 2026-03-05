@@ -1,5 +1,5 @@
-from enum import Enum
 import logging
+from enum import Enum
 from typing import Any, Dict, Optional
 
 from .abstract_zone import AbstractZone, ZoneType
@@ -211,10 +211,10 @@ class TemperatureControlZone(AbstractZone):
 
     def update_from_state(self, state: Dict[str, Any]) -> None:
         """Update temperature control zone from runtime state."""
-        
+
         if "temperature_" in state:
             self.temperature_ = state["temperature_"]
-        
+
         if "setPoint" in state:
             self.set_point = state["setPoint"]
 

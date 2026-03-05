@@ -9,7 +9,7 @@ Main exports:
 - MqttClient: Low-level MQTT protocol client (for advanced use)
 """
 
-from .transporter import MqttTransporter
 from .client import MqttClient
+from .transporter import MqttTransporter
 
 __all__ = ["MqttTransporter", "MqttClient"]

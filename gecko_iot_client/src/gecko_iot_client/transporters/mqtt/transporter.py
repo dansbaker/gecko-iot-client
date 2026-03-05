@@ -11,21 +11,18 @@ import logging
 import threading
 import time
 import uuid
-from datetime import datetime
 from concurrent.futures import Future
+from datetime import datetime
 from typing import Any, Callable, Dict, Optional
 
 from .. import AbstractTransporter
 from ..exceptions import ConfigurationError, ConnectionError
-from .client import MqttClient
-from .token_manager import TokenManager
-from .reconnection_handler import ReconnectionHandler
 from .callback_registry import CallbackRegistry
-from .utils import parse_json_safely, complete_future_safely, notify_callbacks_safely
-from .constants import (
-    NOT_CONNECTED_ERROR,
-    CONNECTION_TIMEOUT
-)
+from .client import MqttClient
+from .constants import CONNECTION_TIMEOUT, NOT_CONNECTED_ERROR
+from .reconnection_handler import ReconnectionHandler
+from .token_manager import TokenManager
+from .utils import complete_future_safely, notify_callbacks_safely, parse_json_safely
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +30,14 @@ logger = logging.getLogger(__name__)
 class MqttTransporter(AbstractTransporter):
     """
     Gecko-specific MQTT transporter.
-    
+
     Responsibilities:
     - Gecko topic structure (config, state, shadow)
     - Token refresh and expiration management
     - Configuration and state loading
     - AbstractTransporter interface implementation
     - Reconnection logic with token refresh
-    
+
     This class contains all Gecko IoT business logic and delegates
     MQTT protocol operations to MqttClient.
     """
@@ -100,7 +97,7 @@ class MqttTransporter(AbstractTransporter):
     def connect(self, **kwargs):
         """Connect using preformatted WebSocket URL with expiration management."""
         self._monitor_stop_event.clear()
-        
+
         if self._mqtt_client.is_connected():
             logger.debug("Already connected")
             return
@@ -114,12 +111,12 @@ class MqttTransporter(AbstractTransporter):
         try:
             # Generate unique client ID
             client_id = f"ha-{self._monitor_id}-{uuid.uuid4().hex}"
-            
+
             # Connect via MQTT client
             self._mqtt_client.connect(
                 broker_url=self._broker_url,
                 client_id=client_id,
-                timeout=kwargs.get("timeout", CONNECTION_TIMEOUT)
+                timeout=kwargs.get("timeout", CONNECTION_TIMEOUT),
             )
 
             # Start expiry monitoring after successful connection
@@ -138,7 +135,7 @@ class MqttTransporter(AbstractTransporter):
 
         # Disconnect MQTT client
         self._mqtt_client.disconnect()
-        
+
         # Clear subscription state
         with self._state_lock:
             self._subscriptions_setup = False
@@ -152,17 +149,17 @@ class MqttTransporter(AbstractTransporter):
     def update_broker_url(self, new_broker_url: str) -> None:
         """
         Update broker URL with a fresh token.
-        
+
         This is useful when reusing an existing connection that needs a token refresh.
         The method updates the broker URL and token manager without disconnecting.
-        
+
         Args:
             new_broker_url: New WebSocket URL with fresh JWT token
         """
         if not new_broker_url:
             logger.warning("Attempted to update with empty broker URL")
             return
-            
+
         logger.debug("Updating broker URL with fresh token")
         self._broker_url = new_broker_url
         self._token_manager.update_broker_url(new_broker_url)
@@ -182,7 +179,7 @@ class MqttTransporter(AbstractTransporter):
         while not self._subscriptions_setup and (time.time() - wait_start) < timeout:
             logger.debug("Waiting for subscriptions to be ready...")
             time.sleep(0.1)
-        
+
         if not self._subscriptions_setup:
             raise ConfigurationError("Subscriptions not ready within timeout")
 
@@ -191,7 +188,7 @@ class MqttTransporter(AbstractTransporter):
         # Create future BEFORE publishing request to avoid race condition
         # where response arrives before future exists
         self._config_future = Future()
-        
+
         topic = self._build_topic("config/get")
 
         try:
@@ -276,8 +273,7 @@ class MqttTransporter(AbstractTransporter):
     def change_state(self, new_state):
         """Change state (placeholder for interface compliance)."""
         notify_callbacks_safely(
-            self._callback_registry.get_callbacks("state_update"), 
-            new_state
+            self._callback_registry.get_callbacks("state_update"), new_state
         )
 
     # ========================================================================
@@ -292,7 +288,7 @@ class MqttTransporter(AbstractTransporter):
         """Refresh token before initial connection attempt."""
         if not self._token_refresh_callback:
             return
-            
+
         try:
             new_broker_url = self._token_refresh_callback(self._monitor_id)
             if new_broker_url:
@@ -315,10 +311,22 @@ class MqttTransporter(AbstractTransporter):
         topics = [
             (self._build_topic("config/get/accepted"), self._on_config_response),
             (self._build_topic("config/get/rejected"), self._on_config_rejected),
-            (self._build_topic("shadow/name/state/get/accepted"), self._on_state_response),
-            (self._build_topic("shadow/name/state/get/rejected"), self._on_state_rejected),
-            (self._build_topic("shadow/name/state/update/documents"), self._on_state_document_update),
-            (self._build_topic("shadow/name/state/update/rejected"), self._on_state_update_rejected),
+            (
+                self._build_topic("shadow/name/state/get/accepted"),
+                self._on_state_response,
+            ),
+            (
+                self._build_topic("shadow/name/state/get/rejected"),
+                self._on_state_rejected,
+            ),
+            (
+                self._build_topic("shadow/name/state/update/documents"),
+                self._on_state_document_update,
+            ),
+            (
+                self._build_topic("shadow/name/state/update/rejected"),
+                self._on_state_update_rejected,
+            ),
         ]
 
         successful_subscriptions = 0
@@ -332,7 +340,9 @@ class MqttTransporter(AbstractTransporter):
 
         if successful_subscriptions > 0:
             self._subscriptions_setup = True
-            logger.debug(f"Set up {successful_subscriptions}/{len(topics)} subscriptions")
+            logger.debug(
+                f"Set up {successful_subscriptions}/{len(topics)} subscriptions"
+            )
 
         else:
             logger.error("Failed to set up any subscriptions")
@@ -368,7 +378,7 @@ class MqttTransporter(AbstractTransporter):
                 # Check if token needs refreshing
                 with self._state_lock:
                     already_refreshing = self._is_refreshing_token
-                
+
                 if not already_refreshing and self._should_refresh_token():
                     logger.info("Token approaching expiry, initiating refresh...")
                     self._handle_token_refresh()
@@ -392,7 +402,7 @@ class MqttTransporter(AbstractTransporter):
 
         with self._state_lock:
             self._is_refreshing_token = True
-        
+
         try:
             # Log timing information
             expiry = self._token_manager.expiry
@@ -406,7 +416,9 @@ class MqttTransporter(AbstractTransporter):
             callback_start = datetime.now()
             new_broker_url = self._token_refresh_callback(self._monitor_id)
             callback_duration = (datetime.now() - callback_start).total_seconds()
-            logger.debug(f"Token refresh callback completed in {callback_duration:.1f}s")
+            logger.debug(
+                f"Token refresh callback completed in {callback_duration:.1f}s"
+            )
             if not new_broker_url:
                 logger.error("Token refresh callback returned empty URL")
                 with self._state_lock:
@@ -418,7 +430,7 @@ class MqttTransporter(AbstractTransporter):
             old_broker_url = self._broker_url
             self._broker_url = new_broker_url
             self._token_manager.update_broker_url(new_broker_url)
-            
+
             # Reset reconnection counter - fresh token means fresh start
             self._reconnection_handler.on_success()
             logger.debug("Token updated, establishing new connection")
@@ -428,31 +440,32 @@ class MqttTransporter(AbstractTransporter):
             # Connectivity events are suppressed via _is_refreshing_token flag
             try:
                 client_id = f"ha-{self._monitor_id}-{uuid.uuid4().hex}"
-                
+
                 # Disconnect old connection (connectivity event will be suppressed)
                 if self._mqtt_client.is_connected():
-                    logger.debug("Disconnecting old connection before token refresh reconnect")
+                    logger.debug(
+                        "Disconnecting old connection before token refresh reconnect"
+                    )
                     self._mqtt_client.disconnect()
-                
+
                 # Establish new connection with fresh token
                 self._mqtt_client.connect(
-                    broker_url=self._broker_url,
-                    client_id=client_id
+                    broker_url=self._broker_url, client_id=client_id
                 )
-                
+
                 # Clear subscription state since we need to re-subscribe with new connection
                 with self._state_lock:
                     self._subscriptions_setup = False
-                
+
                 # Clear intentional disconnect flag
                 self._mqtt_client.clear_intentional_disconnect_flag()
-                
+
                 logger.debug("Token refreshed with minimal downtime")
                 self._reconnection_handler.on_success()
-                
+
                 with self._state_lock:
                     self._is_refreshing_token = False
-                    
+
             except Exception as e:
                 logger.error(f"Reconnection after token refresh failed: {e}")
                 # Restore old broker URL on failure
@@ -476,7 +489,7 @@ class MqttTransporter(AbstractTransporter):
             )
             # Reset counter and try token refresh if available
             self._reconnection_handler.on_success()
-            
+
             if self._token_refresh_callback:
                 # Force a token refresh after cooldown
                 def delayed_refresh():
@@ -484,7 +497,7 @@ class MqttTransporter(AbstractTransporter):
                     if not self._monitor_stop_event.is_set():
                         logger.info("Cooldown period ended, forcing token refresh")
                         self._handle_token_refresh()
-                
+
                 refresh_thread = threading.Thread(target=delayed_refresh, daemon=True)
                 refresh_thread.start()
             return
@@ -500,16 +513,15 @@ class MqttTransporter(AbstractTransporter):
                 try:
                     client_id = f"ha-{self._monitor_id}-{uuid.uuid4().hex}"
                     self._mqtt_client.connect(
-                        broker_url=self._broker_url,
-                        client_id=client_id
+                        broker_url=self._broker_url, client_id=client_id
                     )
                     logger.debug("Reconnection successful")
                     self._reconnection_handler.on_success()
-                    
+
                     # Clear subscription state to force re-setup
                     with self._state_lock:
                         self._subscriptions_setup = False
-                        
+
                 except Exception as e:
                     logger.error(f"Reconnection attempt {attempt_num} failed: {e}")
                     self._schedule_reconnect()
@@ -524,41 +536,43 @@ class MqttTransporter(AbstractTransporter):
     def _on_mqtt_connected(self, connected: bool):
         """Handle MQTT connection status changes."""
         logger.debug(f"MQTT connection status changed: {connected}")
-        
+
         # Check if we're in the middle of a token refresh
         with self._state_lock:
             is_refreshing = self._is_refreshing_token
-        
+
         if connected:
             # Reset reconnection handler on successful connection
             self._reconnection_handler.on_success()
-            
+
             # Schedule subscription setup and state loading in a background thread
             # to avoid blocking the lifecycle callback and allow connection to stabilize
             def setup_after_connection():
                 # Brief delay to ensure MQTT client is fully ready for subscriptions
                 time.sleep(0.5)
-                
+
                 # Always setup subscriptions after connection
                 logger.debug("Setting up subscriptions after connection")
                 with self._state_lock:
                     self._subscriptions_setup = False
-                
+
                 try:
                     self._setup_subscriptions()
-                    
+
                     # Load initial state after subscriptions are ready
                     logger.debug("Loading initial state after connection")
                     try:
                         self.load_state()
                     except Exception as e:
-                        logger.warning(f"Failed to load initial state after connection: {e}")
+                        logger.warning(
+                            f"Failed to load initial state after connection: {e}"
+                        )
                 except Exception as e:
                     logger.error(f"Failed to setup subscriptions after connection: {e}")
-            
+
             setup_thread = threading.Thread(target=setup_after_connection, daemon=True)
             setup_thread.start()
-            
+
             # Suppress connectivity callbacks during token refresh to prevent
             # entities from flickering unavailable during the brief disconnect/reconnect
             if is_refreshing:
@@ -569,22 +583,29 @@ class MqttTransporter(AbstractTransporter):
             # Check if we should attempt reconnection
             with self._state_lock:
                 is_refreshing = self._is_refreshing_token
-            
+
             # Only schedule reconnect if not already refreshing and we have a callback
-            if not is_refreshing and self._token_refresh_callback and not self._monitor_stop_event.is_set():
+            if (
+                not is_refreshing
+                and self._token_refresh_callback
+                and not self._monitor_stop_event.is_set()
+            ):
                 # Check if token is expired/expiring
-                if self._token_manager.is_expired() or self._token_manager.should_refresh(False):
+                if (
+                    self._token_manager.is_expired()
+                    or self._token_manager.should_refresh(False)
+                ):
                     logger.info("Token expired/expiring, will refresh on reconnect")
                     self._token_manager.force_expiry()
-                
+
                 logger.info("Unexpected disconnection, scheduling reconnection...")
                 self._schedule_reconnect()
-            
+
             # Suppress disconnection callbacks during token refresh
             if is_refreshing:
                 logger.debug("Suppressing disconnection callback during token refresh")
                 return
-        
+
         # Notify connectivity callbacks
         self._callback_registry.notify("connectivity", connected)
 
@@ -600,8 +621,7 @@ class MqttTransporter(AbstractTransporter):
         if config:
             config = config.get("configuration", {}).get("configuration", {})
             notify_callbacks_safely(
-                self._callback_registry.get_callbacks("config"),
-                config
+                self._callback_registry.get_callbacks("config"), config
             )
             complete_future_safely(self._config_future, config)
         else:
@@ -624,11 +644,10 @@ class MqttTransporter(AbstractTransporter):
         """Handle state response."""
         logger.debug("State response received")
         state = parse_json_safely(payload)
-        
+
         if state:
             notify_callbacks_safely(
-                self._callback_registry.get_callbacks("state"),
-                state
+                self._callback_registry.get_callbacks("state"), state
             )
             complete_future_safely(self._state_future, state)
         else:
@@ -650,15 +669,15 @@ class MqttTransporter(AbstractTransporter):
         """Handle state document update notifications."""
         logger.debug("State document update received")
         document = parse_json_safely(payload)
-        
+
         if document:
             # Extract current state from document structure
             current_state = document.get("current", {}).get("state", {})
             logger.debug("Extracted state from document")
-            
+
             notify_callbacks_safely(
                 self._callback_registry.get_callbacks("state_update"),
-                {"state": current_state}
+                {"state": current_state},
             )
         else:
             logger.error("Failed to parse state document update")

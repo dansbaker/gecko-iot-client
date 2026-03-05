@@ -59,7 +59,9 @@ class AbstractZone:
         return cls._registry
 
     @classmethod
-    def register_zone_type(cls, zone_type: ZoneType) -> Callable[[type["AbstractZone"]], type["AbstractZone"]]:
+    def register_zone_type(
+        cls, zone_type: ZoneType
+    ) -> Callable[[type["AbstractZone"]], type["AbstractZone"]]:
         """Decorator to register a zone class with its type."""
 
         def decorator(zone_class: type["AbstractZone"]) -> type["AbstractZone"]:
