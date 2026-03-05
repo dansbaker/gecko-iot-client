@@ -2,9 +2,14 @@
 Unit tests for reconnection handler functionality.
 """
 
+import sys
 import unittest
+from pathlib import Path
 
-from src.gecko_iot_client.transporters.mqtt.reconnection_handler import (
+# Add src to path for direct imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from gecko_iot_client.transporters.mqtt.reconnection_handler import (  # noqa: E402
     ReconnectionHandler,
 )
 

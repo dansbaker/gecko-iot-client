@@ -2,11 +2,16 @@
 Unit tests for MQTT utility functions.
 """
 
+import sys
 import unittest
 from concurrent.futures import Future
+from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.gecko_iot_client.transporters.mqtt.utils import (
+# Add src to path for direct imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from gecko_iot_client.transporters.mqtt.utils import (  # noqa: E402
     complete_future_safely,
     notify_callbacks_safely,
     parse_json_safely,
@@ -45,7 +50,7 @@ class TestParseJsonSafely(unittest.TestCase):
         expected = {"nested": {"key": "value"}, "list": [1, 2, 3]}
         self.assertEqual(result, expected)
 
-    @patch("src.gecko_iot_client.transporters.mqtt.utils.logger")
+    @patch("gecko_iot_client.transporters.mqtt.utils.logger")
     def test_parse_logs_error(self, mock_logger):
         """Test that parsing errors are logged."""
         payload = "not valid json"
@@ -142,39 +147,35 @@ class TestNotifyCallbacksSafely(unittest.TestCase):
         # Should not raise an error
         notify_callbacks_safely([], "data")
 
-    def test_notify_callback_exception_handling(self):
+    @patch("gecko_iot_client.transporters.mqtt.utils.logger")
+    def test_notify_callback_exception_handling(self, mock_logger):
         """Test that exceptions in callbacks are caught."""
         callback1 = Mock(side_effect=Exception("Test error"))
         callback2 = Mock()
         data = "test"
 
-        with patch(
-            "src.gecko_iot_client.transporters.mqtt.utils.logger"
-        ) as mock_logger:
-            notify_callbacks_safely([callback1, callback2], data)
+        notify_callbacks_safely([callback1, callback2], data)
 
-            # First callback should have been called and raised exception
-            callback1.assert_called_once_with(data)
-            # Second callback should still be called
-            callback2.assert_called_once_with(data)
-            # Error should be logged
-            mock_logger.error.assert_called_once()
+        # First callback should have been called and raised exception
+        callback1.assert_called_once_with(data)
+        # Second callback should still be called
+        callback2.assert_called_once_with(data)
+        # Error should be logged
+        mock_logger.error.assert_called_once()
 
-    def test_notify_all_callbacks_fail(self):
+    @patch("gecko_iot_client.transporters.mqtt.utils.logger")
+    def test_notify_all_callbacks_fail(self, mock_logger):
         """Test when all callbacks raise exceptions."""
         callback1 = Mock(side_effect=ValueError("Error 1"))
         callback2 = Mock(side_effect=TypeError("Error 2"))
 
-        with patch(
-            "src.gecko_iot_client.transporters.mqtt.utils.logger"
-        ) as mock_logger:
-            notify_callbacks_safely([callback1, callback2], "data")
+        notify_callbacks_safely([callback1, callback2], "data")
 
-            # Both callbacks should have been attempted
-            callback1.assert_called_once()
-            callback2.assert_called_once()
-            # Both errors should be logged
-            self.assertEqual(mock_logger.error.call_count, 2)
+        # Both callbacks should have been attempted
+        callback1.assert_called_once()
+        callback2.assert_called_once()
+        # Both errors should be logged
+        self.assertEqual(mock_logger.error.call_count, 2)
 
     def test_notify_with_none_data(self):
         """Test notifying callbacks with None data."""

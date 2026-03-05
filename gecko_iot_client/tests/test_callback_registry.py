@@ -2,10 +2,17 @@
 Unit tests for callback registry functionality.
 """
 
+import sys
 import unittest
+from pathlib import Path
 from unittest.mock import Mock
 
-from src.gecko_iot_client.transporters.mqtt.callback_registry import CallbackRegistry
+# Add src to path for direct imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from gecko_iot_client.transporters.mqtt.callback_registry import (  # noqa: E402
+    CallbackRegistry,
+)
 
 
 class TestCallbackRegistry(unittest.TestCase):
