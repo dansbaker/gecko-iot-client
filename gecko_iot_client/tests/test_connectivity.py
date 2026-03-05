@@ -43,7 +43,9 @@ class TestConnectivityStatus(unittest.TestCase):
             }
         }
 
-        status = ConnectivityStatus.from_state_data(state_data, transport_connected=True)
+        status = ConnectivityStatus.from_state_data(
+            state_data, transport_connected=True
+        )
         self.assertTrue(status.transport_connected)
         self.assertEqual(status.gateway_status, "CONNECTED")
         self.assertEqual(status.vessel_status, "RUNNING")
@@ -52,7 +54,9 @@ class TestConnectivityStatus(unittest.TestCase):
         """Test creating ConnectivityStatus from state data missing connectivity."""
         state_data = {"state": {"reported": {}}}
 
-        status = ConnectivityStatus.from_state_data(state_data, transport_connected=False)
+        status = ConnectivityStatus.from_state_data(
+            state_data, transport_connected=False
+        )
         self.assertFalse(status.transport_connected)
         self.assertEqual(status.gateway_status, "UNKNOWN")
         self.assertEqual(status.vessel_status, "UNKNOWN")
@@ -110,9 +114,7 @@ class TestConnectivityStatus(unittest.TestCase):
 
     def test_update_from_state_data_unchanged(self):
         """Test updating from state data when connectivity doesn't change."""
-        status = ConnectivityStatus(
-            gateway_status="CONNECTED", vessel_status="RUNNING"
-        )
+        status = ConnectivityStatus(gateway_status="CONNECTED", vessel_status="RUNNING")
 
         state_data = {
             "state": {
@@ -130,9 +132,7 @@ class TestConnectivityStatus(unittest.TestCase):
 
     def test_update_from_state_data_partial_change(self):
         """Test updating when only one status changes."""
-        status = ConnectivityStatus(
-            gateway_status="CONNECTED", vessel_status="RUNNING"
-        )
+        status = ConnectivityStatus(gateway_status="CONNECTED", vessel_status="RUNNING")
 
         state_data = {
             "state": {

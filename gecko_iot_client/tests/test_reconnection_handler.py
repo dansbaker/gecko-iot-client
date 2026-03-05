@@ -20,9 +20,7 @@ class TestReconnectionHandler(unittest.TestCase):
 
     def test_custom_initialization(self):
         """Test initialization with custom parameters."""
-        handler = ReconnectionHandler(
-            max_attempts=5, base_delay=2.0, max_delay=60.0
-        )
+        handler = ReconnectionHandler(max_attempts=5, base_delay=2.0, max_delay=60.0)
         self.assertEqual(handler._max_attempts, 5)
         self.assertEqual(handler._base_delay, 2.0)
         self.assertEqual(handler._max_delay, 60.0)

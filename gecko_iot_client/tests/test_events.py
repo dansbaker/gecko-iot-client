@@ -44,7 +44,9 @@ class TestEventEmitter(unittest.TestCase):
         callback = Mock()
         self.emitter.on(EventChannel.CONNECTIVITY_UPDATE, callback)
 
-        self.assertIn(callback, self.emitter._callbacks[EventChannel.CONNECTIVITY_UPDATE])
+        self.assertIn(
+            callback, self.emitter._callbacks[EventChannel.CONNECTIVITY_UPDATE]
+        )
 
     def test_on_register_multiple_callbacks(self):
         """Test registering multiple callbacks for same channel."""
@@ -150,7 +152,9 @@ class TestEventEmitter(unittest.TestCase):
 
         self.emitter.clear(EventChannel.CONNECTIVITY_UPDATE)
 
-        self.assertEqual(len(self.emitter._callbacks[EventChannel.CONNECTIVITY_UPDATE]), 0)
+        self.assertEqual(
+            len(self.emitter._callbacks[EventChannel.CONNECTIVITY_UPDATE]), 0
+        )
         self.assertEqual(len(self.emitter._callbacks[EventChannel.ZONE_UPDATE]), 1)
 
     def test_clear_all_channels(self):

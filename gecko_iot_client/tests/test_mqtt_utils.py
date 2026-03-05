@@ -148,7 +148,9 @@ class TestNotifyCallbacksSafely(unittest.TestCase):
         callback2 = Mock()
         data = "test"
 
-        with patch("src.gecko_iot_client.transporters.mqtt.utils.logger") as mock_logger:
+        with patch(
+            "src.gecko_iot_client.transporters.mqtt.utils.logger"
+        ) as mock_logger:
             notify_callbacks_safely([callback1, callback2], data)
 
             # First callback should have been called and raised exception
@@ -163,7 +165,9 @@ class TestNotifyCallbacksSafely(unittest.TestCase):
         callback1 = Mock(side_effect=ValueError("Error 1"))
         callback2 = Mock(side_effect=TypeError("Error 2"))
 
-        with patch("src.gecko_iot_client.transporters.mqtt.utils.logger") as mock_logger:
+        with patch(
+            "src.gecko_iot_client.transporters.mqtt.utils.logger"
+        ) as mock_logger:
             notify_callbacks_safely([callback1, callback2], "data")
 
             # Both callbacks should have been attempted

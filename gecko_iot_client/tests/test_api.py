@@ -3,7 +3,7 @@ Unit tests for Gecko API client.
 """
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from aiohttp import ClientSession
 
@@ -13,8 +13,14 @@ from src.gecko_iot_client.api import GeckoApiClient
 class MockGeckoApiClient(GeckoApiClient):
     """Mock implementation of GeckoApiClient for testing."""
 
-    def __init__(self, websession, api_url=None, auth0_url=None, access_token="test_token"):
-        super().__init__(websession, api_url or "https://api.test.com", auth0_url or "https://auth.test.com")
+    def __init__(
+        self, websession, api_url=None, auth0_url=None, access_token="test_token"
+    ):
+        super().__init__(
+            websession,
+            api_url or "https://api.test.com",
+            auth0_url or "https://auth.test.com",
+        )
         self._access_token = access_token
 
     async def async_get_access_token(self):
@@ -43,7 +49,9 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
         mock_response.raise_for_status = MagicMock()
 
         self.websession.get = MagicMock(return_value=mock_response)
-        self.websession.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.get.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.get.return_value.__aexit__ = AsyncMock()
 
         user_id = await self.client.async_get_user_id()
@@ -61,7 +69,9 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
         mock_response.raise_for_status = MagicMock()
 
         self.websession.get = MagicMock(return_value=mock_response)
-        self.websession.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.get.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.get.return_value.__aexit__ = AsyncMock()
 
         with self.assertRaises(ValueError) as context:
@@ -76,7 +86,9 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
         mock_response.raise_for_status = MagicMock()
 
         self.websession.request = MagicMock(return_value=mock_response)
-        self.websession.request.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.request.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.request.return_value.__aexit__ = AsyncMock()
 
         result = await self.client.async_request("GET", "/test/endpoint")
@@ -95,7 +107,9 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
         mock_response.raise_for_status = MagicMock()
 
         self.websession.request = MagicMock(return_value=mock_response)
-        self.websession.request.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.request.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.request.return_value.__aexit__ = AsyncMock()
 
         result = await self.client.async_request("POST", "/test", json={"key": "value"})
@@ -112,7 +126,9 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
         mock_response.raise_for_status = MagicMock()
 
         self.websession.request = MagicMock(return_value=mock_response)
-        self.websession.request.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.request.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.request.return_value.__aexit__ = AsyncMock()
 
         await self.client.async_request("GET", "/test", headers={"Custom": "Header"})
@@ -125,11 +141,15 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
     async def test_async_get_vessels_list_response(self):
         """Test getting vessels when response is a list."""
         mock_response = AsyncMock()
-        mock_response.json = AsyncMock(return_value=[{"id": "vessel1"}, {"id": "vessel2"}])
+        mock_response.json = AsyncMock(
+            return_value=[{"id": "vessel1"}, {"id": "vessel2"}]
+        )
         mock_response.raise_for_status = MagicMock()
 
         self.websession.request = MagicMock(return_value=mock_response)
-        self.websession.request.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.request.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.request.return_value.__aexit__ = AsyncMock()
 
         vessels = await self.client.async_get_vessels("account123")
@@ -146,7 +166,9 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
         mock_response.raise_for_status = MagicMock()
 
         self.websession.request = MagicMock(return_value=mock_response)
-        self.websession.request.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.request.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.request.return_value.__aexit__ = AsyncMock()
 
         vessels = await self.client.async_get_vessels("account123")
@@ -161,7 +183,9 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
         mock_response.raise_for_status = MagicMock()
 
         self.websession.request = MagicMock(return_value=mock_response)
-        self.websession.request.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.request.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.request.return_value.__aexit__ = AsyncMock()
 
         vessels = await self.client.async_get_vessels("account123")
@@ -175,7 +199,9 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
         mock_response.raise_for_status = MagicMock()
 
         self.websession.request = MagicMock(return_value=mock_response)
-        self.websession.request.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.request.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.request.return_value.__aexit__ = AsyncMock()
 
         vessels = await self.client.async_get_vessels("account123")
@@ -189,7 +215,9 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
         mock_response.raise_for_status = MagicMock()
 
         self.websession.request = MagicMock(return_value=mock_response)
-        self.websession.request.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.request.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.request.return_value.__aexit__ = AsyncMock()
 
         vessels = await self.client.async_get_vessels("account123")
@@ -199,11 +227,15 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
     async def test_async_get_user_info(self):
         """Test getting user info."""
         mock_response = AsyncMock()
-        mock_response.json = AsyncMock(return_value={"name": "Test User", "email": "test@example.com"})
+        mock_response.json = AsyncMock(
+            return_value={"name": "Test User", "email": "test@example.com"}
+        )
         mock_response.raise_for_status = MagicMock()
 
         self.websession.request = MagicMock(return_value=mock_response)
-        self.websession.request.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.request.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.request.return_value.__aexit__ = AsyncMock()
 
         user_info = await self.client.async_get_user_info("user123")
@@ -221,7 +253,9 @@ class TestGeckoApiClient(unittest.IsolatedAsyncioTestCase):
         mock_response.raise_for_status = MagicMock()
 
         self.websession.request = MagicMock(return_value=mock_response)
-        self.websession.request.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        self.websession.request.return_value.__aenter__ = AsyncMock(
+            return_value=mock_response
+        )
         self.websession.request.return_value.__aexit__ = AsyncMock()
 
         livestream = await self.client.async_get_monitor_livestream("monitor123")

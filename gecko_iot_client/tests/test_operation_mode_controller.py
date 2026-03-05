@@ -97,7 +97,9 @@ class TestOperationModeController(unittest.TestCase):
             with self.subTest(mode=mode):
                 callback.reset_mock()
                 controller.set_mode(mode)
-                callback.assert_called_once_with("operationMode", {"operationMode": expected_value})
+                callback.assert_called_once_with(
+                    "operationMode", {"operationMode": expected_value}
+                )
 
     def test_mode_name_property(self):
         """Test mode_name property returns correct names."""
@@ -169,7 +171,6 @@ class TestOperationModeController(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
 
     def test_set_mode_invalid_type(self):
         """Test setting mode with invalid type."""
