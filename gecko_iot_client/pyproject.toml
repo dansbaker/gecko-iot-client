@@ -48,7 +48,8 @@ dev = [
     "isort>=5.12.0",
     "flake8>=6.0.0",
     "auto-changelog>=0.6.0",
-    "setuptools-scm>=8.0"
+    "setuptools-scm>=8.0",
+    "pre-commit>=3.5.0"
 ]
 
 [project.scripts]
