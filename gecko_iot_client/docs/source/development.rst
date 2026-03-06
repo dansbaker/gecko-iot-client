@@ -21,11 +21,11 @@ Clone and Setup
    # Clone the repository
    git clone <repository-url>
    cd geckoIotClient/python/gecko_iot_client
-   
+
    # Create virtual environment
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
-   
+
    # Install development dependencies
    pip install -e .[dev,docs]
 
@@ -57,7 +57,7 @@ Code Style
 The project follows Python best practices:
 
 * **Black** for code formatting
-* **isort** for import sorting  
+* **isort** for import sorting
 * **flake8** for linting
 * **Type hints** throughout
 * **Google-style docstrings**
@@ -69,10 +69,10 @@ Format Code
 
    # Format code
    black src/ tests/ examples/
-   
+
    # Sort imports
    isort src/ tests/ examples/
-   
+
    # Check linting
    flake8 src/ tests/ examples/
 
@@ -86,13 +86,13 @@ Unit Tests
 
    # Run all tests
    pytest
-   
+
    # Run with coverage
    pytest --cov=gecko_iot_client --cov-report=html
-   
+
    # Run specific test file
    pytest tests/test_zone_states.py
-   
+
    # Run with verbose output
    pytest -v
 
@@ -105,7 +105,7 @@ Aim for high test coverage:
 
    # Generate coverage report
    pytest --cov=gecko_iot_client --cov-report=term-missing
-   
+
    # Generate HTML coverage report
    pytest --cov=gecko_iot_client --cov-report=html
    open htmlcov/index.html
@@ -119,8 +119,8 @@ Example test structure:
 
    import pytest
    from gecko_iot_client.models.zone_states import FlowZone, ZoneType
-   
-   
+
+
    class TestFlowZone:
        def test_flow_zone_creation(self):
            """Test basic flow zone creation"""
@@ -131,12 +131,12 @@ Example test structure:
                speed=75.0,
                active=True
            )
-           
+
            assert zone.id == "pump1"
            assert zone.name == "Main Circulation"
            assert zone.speed == 75.0
            assert zone.active is True
-       
+
        def test_flow_zone_validation(self):
            """Test flow zone field validation"""
            with pytest.raises(ValueError):
@@ -145,18 +145,18 @@ Example test structure:
                    zone_type=ZoneType.FLOW_ZONE,
                    speed=150.0  # Invalid: > 100
                )
-       
+
        def test_flow_zone_callbacks(self):
            """Test zone change callbacks"""
            zone = FlowZone(id="pump1", zone_type=ZoneType.FLOW_ZONE)
-           
+
            changes = []
            def callback(attr, old, new):
                changes.append((attr, old, new))
-           
+
            zone.register_callback(callback, "speed")
            zone.speed = 50.0
-           
+
            assert len(changes) == 1
            assert changes[0] == ("speed", None, 50.0)
 
@@ -171,10 +171,10 @@ Building Documentation
    # Build HTML documentation
    cd docs
    make html
-   
+
    # View documentation
    open build/html/index.html
-   
+
    # Clean build
    make clean html
 
@@ -187,11 +187,11 @@ For development, use auto-rebuild:
 
    # Install sphinx-autobuild
    pip install sphinx-autobuild
-   
+
    # Start live documentation server
    cd docs
    make livehtml
-   
+
    # Open http://localhost:8000 in browser
 
 Documentation Guidelines
@@ -209,17 +209,17 @@ Example docstring:
    def set_speed_desired(self, speed: float, active: bool = True) -> None:
        """
        Set flow speed in desired state (publishes to AWS IoT).
-       
+
        This method validates the speed value and publishes the desired
        state update to the AWS IoT Device Shadow service.
-       
+
        Args:
            speed: Flow speed percentage between 0.0 and 100.0
            active: Whether to activate the zone (default: True)
-           
+
        Raises:
            ValueError: If speed is outside valid range (0-100)
-           
+
        Example:
            >>> pump = flow_zones[0]
            >>> pump.set_speed_desired(75.0, active=True)
@@ -234,7 +234,7 @@ Enable Debug Logging
 .. code-block:: python
 
    import logging
-   
+
    # Enable debug logging
    logging.basicConfig(
        level=logging.DEBUG,
@@ -250,12 +250,12 @@ For testing without AWS IoT:
 
    from unittest.mock import Mock
    from gecko_iot_client import GeckoIotClient
-   
+
    # Create mock transporter
    mock_transporter = Mock()
    mock_transporter.connect.return_value = None
    mock_transporter.disconnect.return_value = None
-   
+
    # Use mock in tests
    client = GeckoIotClient("test-device", mock_transporter)
 
@@ -270,8 +270,8 @@ Test with real AWS IoT:
    import pytest
    from gecko_iot_client import GeckoIotClient
    from gecko_iot_client.transporters.mqtt import MqttTransporter
-   
-   
+
+
    @pytest.mark.integration
    @pytest.mark.skipif(
        not os.getenv("AWS_IOT_ENDPOINT"),
@@ -285,7 +285,7 @@ Test with real AWS IoT:
            private_key_path=os.getenv("AWS_IOT_KEY_PATH"),
            ca_file_path=os.getenv("AWS_IOT_CA_PATH")
        )
-       
+
        with GeckoIotClient("test-device", transporter) as client:
            # Test basic functionality
            zones = client.get_zones()
@@ -302,12 +302,12 @@ Benchmark Zone Operations
    import time
    import statistics
    from gecko_iot_client.models.zone_states import FlowZone, ZoneType
-   
-   
+
+
    def benchmark_zone_updates():
        """Benchmark zone attribute updates"""
        zone = FlowZone(id="test", zone_type=ZoneType.FLOW_ZONE)
-       
+
        # Measure update performance
        times = []
        for i in range(1000):
@@ -315,7 +315,7 @@ Benchmark Zone Operations
            zone.speed = float(i % 100)
            end = time.perf_counter()
            times.append(end - start)
-       
+
        print(f"Average update time: {statistics.mean(times):.6f}s")
        print(f"Median update time: {statistics.median(times):.6f}s")
 
@@ -326,7 +326,7 @@ Memory Profiling
 
    # Install memory profiler
    pip install memory-profiler
-   
+
    # Profile memory usage
    python -m memory_profiler examples/demo.py
 
@@ -350,13 +350,13 @@ Create Release
 
    # Ensure tests pass
    pytest
-   
+
    # Update version
    # Edit pyproject.toml
-   
+
    # Build package
    python -m build
-   
+
    # Create git tag
    git tag v0.2.0
    git push origin v0.2.0
@@ -368,13 +368,13 @@ Publishing
 
    # Install build tools
    pip install build twine
-   
+
    # Build package
    python -m build
-   
+
    # Check package
    twine check dist/*
-   
+
    # Upload to PyPI (test first)
    twine upload --repository testpypi dist/*
    twine upload dist/*
@@ -387,33 +387,33 @@ GitHub Actions workflow example:
 .. code-block:: yaml
 
    name: Tests
-   
+
    on: [push, pull_request]
-   
+
    jobs:
      test:
        runs-on: ubuntu-latest
        strategy:
          matrix:
            python-version: [3.13]
-       
+
        steps:
        - uses: actions/checkout@v2
-       
+
        - name: Set up Python ${{ matrix.python-version }}
          uses: actions/setup-python@v2
          with:
            python-version: ${{ matrix.python-version }}
-       
+
        - name: Install dependencies
          run: |
            python -m pip install --upgrade pip
            pip install -e .[dev]
-       
+
        - name: Run tests
          run: |
            pytest --cov=gecko_iot_client
-       
+
        - name: Check code style
          run: |
            black --check src/ tests/

@@ -14,6 +14,7 @@ class SpeedConfig(TypedDict):
     minimum: int
     stepIncrement: int
 
+
 class FlowConfiguration(TypedDict):
     """Configuration dictionary for flow zones."""
 

@@ -19,10 +19,10 @@ This method embeds authentication directly in the broker URL:
 .. code-block:: python
 
    from gecko_iot_client.transporters.mqtt import MqttTransporter
-   
+
    # Complete broker URL with embedded authentication
    broker_url = 'wss://your-endpoint.iot.us-east-1.amazonaws.com/mqtt?x-amz-customauthorizer-name=YourCustomAuthorizer&token=your_auth_token&x-amz-customauthorizer-signature=your_signature'
-   
+
    transporter = MqttTransporter(broker_url)
 
 URL Format Details
@@ -58,10 +58,10 @@ Monitor connection state changes:
 
    def on_connection_state_change(state):
        print(f"🔌 Connection state changed to: {state}")
-   
+
    def on_connection_event(event):
        print(f"🔌 Connection event: {event.state.value} - {event.message}")
-   
+
    transporter = MqttTransporter(broker_url)
    transporter.on_connection_state_change(on_connection_state_change)
    transporter.on_connection_event(on_connection_event)
@@ -74,13 +74,13 @@ Configure logging for better debugging:
 .. code-block:: python
 
    import logging
-   
+
    # Basic logging setup
    logging.basicConfig(
        level=logging.INFO,
        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
    )
-   
+
    # More detailed logging for debugging
    logging.basicConfig(
        level=logging.DEBUG,
@@ -101,11 +101,11 @@ Different components use different loggers:
    # Main client logger
    client_logger = logging.getLogger('GeckoIotClient')
    client_logger.setLevel(logging.INFO)
-   
+
    # Transport logger
    transport_logger = logging.getLogger('MqttTransporter')
    transport_logger.setLevel(logging.DEBUG)
-   
+
    # Zone logger
    zone_logger = logging.getLogger('ZoneStateManager')
    zone_logger.setLevel(logging.INFO)
@@ -141,17 +141,17 @@ WebSocket Authentication
    import os
    from gecko_iot_client import GeckoIotClient
    from gecko_iot_client.transporters.mqtt import MqttTransporter
-   
+
    # Configuration from environment
    device_id = os.getenv("GECKO_DEVICE_ID")
    broker_url = os.getenv("GECKO_BROKER_URL")
-   
+
    # Validate required configuration
    if not device_id:
        raise ValueError("GECKO_DEVICE_ID environment variable required")
    if not broker_url:
        raise ValueError("GECKO_BROKER_URL environment variable required")
-   
+
    # Create client
    transporter = MqttTransporter(broker_url)
    client = GeckoIotClient(device_id, transporter)
@@ -184,7 +184,7 @@ Efficient zone monitoring:
    def efficient_zone_callback(zone_name):
        """Optimized callback that only logs important changes"""
        important_attributes = {'active', 'speed', 'temperature_', 'set_point'}
-       
+
        def callback(attribute, old_value, new_value):
            if attribute in important_attributes:
                print(f"[{zone_name}] {attribute}: {old_value} → {new_value}")
@@ -209,11 +209,11 @@ Enable debug logging for troubleshooting:
 .. code-block:: python
 
    import logging
-   
+
    # Enable debug logging for all gecko components
    logging.getLogger('gecko_iot_client').setLevel(logging.DEBUG)
    logging.getLogger('awscrt').setLevel(logging.WARNING)  # Reduce AWS noise
-   
+
    # Use debug transporter
    transporter = MqttTransporter(
        # ... config
@@ -232,14 +232,14 @@ Test basic connectivity:
        try:
            transporter.connect()
            print("✓ MQTT connection successful")
-           
+
            # Test configuration loading
            transporter.load_configuration()
            print("✓ Configuration loading initiated")
-           
+
            transporter.disconnect()
            print("✓ Clean disconnection")
-           
+
        except Exception as e:
            print(f"❌ Connectivity test failed: {e}")
            raise

@@ -73,7 +73,7 @@ mqtt = MqttTransporter()
 # Connect with token refresh capability
 mqtt.connect(
     "your-iot-endpoint.iot.us-east-1.amazonaws.com",
-    client_id="my-device", 
+    client_id="my-device",
     username="device_user",
     password="initial_token",
     region="us-east-1",
@@ -196,8 +196,8 @@ The transporter provides comprehensive error handling:
 
 ```python
 from gecko_iot_client.transporters.exceptions import (
-    ConnectionError, 
-    AuthenticationError, 
+    ConnectionError,
+    AuthenticationError,
     TokenRefreshError
 )
 

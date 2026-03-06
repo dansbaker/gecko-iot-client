@@ -20,29 +20,29 @@ concurrency:
 jobs:
   build-docs:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-    
+
     - name: Set up Python 3.13
       uses: actions/setup-python@v5
       with:
         python-version: "3.13"
         cache: 'pip'
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         cd gecko_iot_client
         pip install -e .[docs,dev]
-    
+
     - name: Build documentation
       run: |
         cd gecko_iot_client/docs
         make clean
         make html
-    
+
     - name: Check documentation build
       run: |
         DOC_PATH="gecko_iot_client/docs/build/html/index.html"
@@ -56,17 +56,17 @@ jobs:
         echo "✅ Documentation built successfully"
         echo "📁 Documentation files:"
         ls -la gecko_iot_client/docs/build/html/
-    
+
     - name: Setup Pages
       if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
       uses: actions/configure-pages@v4
-    
+
     - name: Upload to GitHub Pages
       if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
       uses: actions/upload-pages-artifact@v3
       with:
         path: gecko_iot_client/docs/build/html/
-    
+
     - name: Upload documentation artifacts (for PR preview)
       if: github.event_name == 'pull_request'
       uses: actions/upload-artifact@v4
@@ -79,11 +79,11 @@ jobs:
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     needs: build-docs
     runs-on: ubuntu-latest
-    
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    
+
     steps:
     - name: Deploy to GitHub Pages
       id: deployment

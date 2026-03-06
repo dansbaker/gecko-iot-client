@@ -113,7 +113,7 @@ Description of the example.
 .. code-block:: python
 
    from gecko_iot_client import GeckoIotClient
-   
+
    # Example code here
 ```
 

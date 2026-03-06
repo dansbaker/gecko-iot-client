@@ -27,11 +27,11 @@ Set up your development environment:
    # Clone your fork
    git clone https://github.com/your-username/geckoIotClient.git
    cd geckoIotClient/python/gecko_iot_client
-   
+
    # Create virtual environment
    python -m venv venv
    source venv/bin/activate
-   
+
    # Install development dependencies
    pip install -e .[dev,docs]
 
@@ -101,12 +101,12 @@ Pull Request Process
 
    # Run tests
    pytest
-   
+
    # Check code style
    black src/ tests/
    isort src/ tests/
    flake8 src/ tests/
-   
+
    # Build docs
    cd docs && make html
 
@@ -118,7 +118,7 @@ Use clear commit messages:
 
    git add .
    git commit -m "Add: New zone type for water features
-   
+
    - Implement WaterFeatureZone class
    - Add validation for water flow rates
    - Include tests and documentation"
@@ -149,38 +149,38 @@ Example:
 .. code-block:: python
 
    from typing import Optional, Dict, Any
-   
-   
+
+
    class ExampleZone(AbstractZone):
        """
        Example zone for demonstration purposes.
-       
+
        This zone shows proper code style including type hints,
        docstrings, and validation.
-       
+
        Args:
            id: Unique zone identifier
            name: Optional zone name
            zone_type: Type of zone
        """
-       
+
        def set_value(self, value: float, active: Optional[bool] = None) -> None:
            """
            Set a value for this zone.
-           
+
            Args:
                value: The value to set (0.0 to 100.0)
                active: Whether to activate the zone
-               
+
            Raises:
                ValueError: If value is outside valid range
-               
+
            Example:
                >>> zone.set_value(75.0, active=True)
            """
            if not 0.0 <= value <= 100.0:
                raise ValueError(f"Value must be 0-100, got {value}")
-           
+
            # Implementation here
 
 Documentation Style
@@ -209,24 +209,24 @@ Test Structure
 
    class TestNewFeature:
        """Test suite for new feature"""
-       
+
        def test_basic_functionality(self):
            """Test basic feature operation"""
            # Arrange
            zone = create_test_zone()
-           
+
            # Act
            result = zone.perform_action()
-           
+
            # Assert
            assert result is not None
            assert zone.state == "expected"
-       
+
        def test_edge_cases(self):
            """Test edge cases and error conditions"""
            with pytest.raises(ValueError):
                zone.invalid_operation()
-       
+
        @pytest.mark.integration
        def test_with_real_transport(self):
            """Integration test with real transport"""
@@ -241,16 +241,16 @@ Use mocks for external dependencies:
 .. code-block:: python
 
    from unittest.mock import Mock, patch
-   
-   
+
+
    def test_with_mock_transport():
        """Test using mock transport"""
        mock_transport = Mock()
        mock_transport.publish_desired_state.return_value = Future()
-       
+
        zone = FlowZone(id="test", zone_type=ZoneType.FLOW_ZONE)
        zone.set_state_manager(Mock())
-       
+
        # Test without real network calls
 
 Documentation Guidelines
@@ -369,7 +369,7 @@ Include:
 
    # Bug reproduction example
    from gecko_iot_client import GeckoIotClient
-   
+
    # This should work but raises an error
    client = GeckoIotClient("test", None)
    zones = client.get_zones()  # Error occurs here

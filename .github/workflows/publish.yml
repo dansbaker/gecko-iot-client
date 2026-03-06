@@ -44,7 +44,7 @@ jobs:
         if [[ "${{ github.ref }}" == refs/tags/* ]]; then
           release_tag="${{ github.ref_name }}"
           echo "Using release tag from workflow trigger: $release_tag"
-          
+
           # Remove any alpha/beta/rc tags on the same commit to avoid conflicts
           git tag --points-at HEAD | grep -E "v.*-(alpha|beta|rc|a[0-9]+)" | while read tag; do
             if [ -n "$tag" ]; then
@@ -52,7 +52,7 @@ jobs:
               git tag -d "$tag" || true
             fi
           done
-          
+
           echo "Git describe result: $(git describe --tags --exact-match 2>/dev/null || echo $release_tag)"
         else
           echo "Not triggered by a tag push, skipping tag cleanup"
