@@ -20,7 +20,7 @@ classifiers = [
 keywords = ["gecko", "iot", "aws", "spa", "hot-tub"]
 dependencies = [
     "awscrt>=0.19.0",
-    "awsiot>=0.1.0",
+    "awsiotsdk>=1.28.1",
     "aiohttp>=3.13.0",
 ]
 
@@ -39,7 +39,7 @@ docs = [
     "sphinxcontrib-napoleon>=0.7",
     "sphinx-autobuild>=2024.4.16",
     "awscrt>=0.19.0",
-    "awsiot>=0.1.0"
+    "awsiotsdk>=1.21.0"
 ]
 dev = [
     "pytest>=7.0.0",
