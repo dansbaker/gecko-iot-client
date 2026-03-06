@@ -42,17 +42,17 @@ async def main():
         endpoint="wss://your-endpoint.iot.region.amazonaws.com/mqtt",
         device_id="your-device-id"
     )
-    
+
     # Initialize client
     client = GeckoIotClient(idd="your-device-id", transporter=transporter)
-    
+
     async with client:
         # Get all temperature control zones
         temp_zones = client.get_zones_by_type(ZoneType.TEMPERATURE_CONTROL_ZONE)
-        
+
         for zone in temp_zones:
             print(f"Zone {zone.name}: {zone.temperature}°C (target: {zone.target_temperature}°C)")
-        
+
         # Control lighting
         lighting_zones = client.get_zones_by_type(ZoneType.LIGHTING_ZONE)
         if lighting_zones:
@@ -199,7 +199,7 @@ All releases use the `v` prefix in git tags:
 ```bash
 # Release versions
 v1.0.0          # Major release
-v1.1.0          # Minor release  
+v1.1.0          # Minor release
 v1.1.1          # Patch release
 
 # Pre-release versions
@@ -248,5 +248,5 @@ See [CHANGELOG.md](CHANGELOG.md) for a detailed version history.
 
 ---
 
-**Made with ❤️ by the Gecko Team**  
-*Powering the future of smart pool and spa control*
+**Made with ❤️ by the Gecko Team**
+*Powering the future of spa control*
