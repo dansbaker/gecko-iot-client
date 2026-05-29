@@ -425,11 +425,17 @@ class GeckoIotClient:
         """
 
         def _publish_if_connected(publish_func, error_context: str, *args, **kwargs):
-            """Helper to publish only if connected."""
+            """Helper to publish only if connected, waiting for delivery confirmation."""
             if self.is_connected:
                 try:
-                    publish_func(*args, **kwargs)
+                    future = publish_func(*args, **kwargs)
+                    # Wait for PUBACK to confirm actual delivery to broker
+                    future.result(timeout=5.0)
                     self._logger.info(f"✅ Published desired state for {error_context}")
+                except TimeoutError:
+                    self._logger.error(
+                        f"❌ Publish timed out for {error_context} — message may not have been delivered"
+                    )
                 except Exception as e:
                     self._logger.error(
                         f"❌ Failed to publish desired state for {error_context}: {e}"
