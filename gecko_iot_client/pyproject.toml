@@ -1,6 +1,6 @@
 [project]
 name = "gecko-iot-client-community"
-version = "0.3.0"
+version = "0.4.0"
 description = "Community fork of the Gecko IoT client with fixes & extensions for the Home Assistant integration"
 authors = [
     {name = "alex-reid-gecko", email = "areid@geckoal.com"}

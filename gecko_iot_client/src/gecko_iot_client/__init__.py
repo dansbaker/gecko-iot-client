@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Callable, Dict, List
 
+from . import extension_metrics
 from .api import GeckoApiClient
 from .models.connectivity import ConnectivityStatus
 from .models.events import EventChannel, EventEmitter
@@ -34,13 +35,20 @@ __all__ = [
     "OperationModeStatus",
     "OperationModeController",
     "GeckoApiClient",
+    "extension_metrics",
 ]
 
-# Get version from setuptools-scm
+# Read version from installed package metadata. The community fork ships as
+# `gecko-iot-client-community` but the import name stays `gecko_iot_client`.
 try:
-    from importlib.metadata import version
+    from importlib.metadata import PackageNotFoundError, version
 
-    __version__ = version("gecko-iot-client")
+    try:
+        __version__ = version("gecko-iot-client-community")
+    except PackageNotFoundError:
+        # Fall back to the upstream name so existing installs still report
+        # something sensible.
+        __version__ = version("gecko-iot-client")
 except Exception:
     # Fallback for development/testing
     __version__ = "0.0.0.dev0"
