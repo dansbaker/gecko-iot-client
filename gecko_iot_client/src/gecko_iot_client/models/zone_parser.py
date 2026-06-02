@@ -133,14 +133,15 @@ class ZoneConfigurationParser:
         reported_state = state.get("reported", {})
         desired_state = state.get("desired", {})
 
-        # Look for zone runtime state data in the reported state first, then desired state
-        zones_state = reported_state.get("zones", {}) if reported_state else {}
-
-        if not zones_state and desired_state:
-            logger.debug(
-                "No zones runtime state found in reported state, checking desired state"
-            )
-            zones_state = desired_state.get("zones", {})
+        # Merge reported and desired zone trees per zone id so a fresh setpoint
+        # write isn't clobbered by stale reported state on the next snapshot.
+        # AWS shadow semantics: `desired` carries the controller's new target,
+        # `reported` lags until the spa applies it. Using only `reported` (the
+        # previous behavior) makes clients rubberband to the old value until
+        # the spa catches up.
+        reported_zones = reported_state.get("zones", {}) if reported_state else {}
+        desired_zones = desired_state.get("zones", {}) if desired_state else {}
+        zones_state = self._merge_shadow_zone_trees(reported_zones, desired_zones)
 
         if not zones_state:
             logger.debug("No zones runtime state found")
@@ -191,3 +192,73 @@ class ZoneConfigurationParser:
                     )
 
         logger.debug(f"Applied runtime state to {updated_count} zones")
+
+    @staticmethod
+    def _merge_shadow_zone_trees(
+        reported_zones: Any, desired_zones: Any
+    ) -> Dict[str, Dict[Any, Dict[str, Any]]]:
+        """Build a ``{zone_type: {zone_id: runtime_state}}`` tree where keys in
+        ``desired`` shallow-override matching keys in ``reported`` per zone id.
+
+        AWS device-shadow snapshots can carry both branches: ``reported`` is the
+        spa's last-known state, ``desired`` is the latest target written by a
+        controller. Once a setpoint is published, ``desired`` holds the new
+        value but ``reported`` lags until the spa applies it. Re-applying
+        ``reported`` alone (the historical behavior) clobbers the new value in
+        the in-memory zone, making clients rubberband. Merging per zone id
+        keeps the fresh target until ``reported`` catches up.
+
+        Returns an empty dict when neither branch carries usable zone data.
+        """
+        rz = reported_zones if isinstance(reported_zones, dict) else {}
+        dz = desired_zones if isinstance(desired_zones, dict) else {}
+        merged: Dict[str, Dict[Any, Dict[str, Any]]] = {}
+        for ztype_key, by_id in rz.items():
+            if isinstance(by_id, dict):
+                merged[ztype_key] = {
+                    zid: (dict(state) if isinstance(state, dict) else state)
+                    for zid, state in by_id.items()
+                }
+        for ztype_key, by_id in dz.items():
+            if not isinstance(by_id, dict):
+                continue
+            bucket = merged.setdefault(ztype_key, {})
+            for zid, dstate in by_id.items():
+                if isinstance(dstate, dict) and isinstance(bucket.get(zid), dict):
+                    bucket[zid] = {**bucket[zid], **dstate}
+                elif isinstance(dstate, dict):
+                    bucket[zid] = dict(dstate)
+                elif dstate is not None:
+                    bucket[zid] = dstate
+        # Normalize spa-quirk key aliases so later state application doesn't
+        # depend on which branch a field arrived in.
+        ZoneConfigurationParser._normalize_zone_state_aliases(merged)
+        return merged
+
+    @staticmethod
+    def _normalize_zone_state_aliases(
+        zones_state: Dict[str, Dict[Any, Dict[str, Any]]],
+    ) -> None:
+        """Align field names that Gecko publishes inconsistently across branches.
+
+        Observed cases:
+        * flow zones expose ``active`` in some shadows and ``isActive`` in others;
+        * temperature zones write ``setPoint`` (controller) and ``setpoint`` (spa).
+
+        Without this, a shallow merge can leave both keys present and the order
+        in which the zone consumes them decides which wins.
+        """
+        flow_bucket = zones_state.get("flow") or {}
+        for runtime in flow_bucket.values():
+            if isinstance(runtime, dict):
+                if "active" in runtime and "isActive" not in runtime:
+                    runtime["isActive"] = runtime["active"]
+                elif "isActive" in runtime and "active" not in runtime:
+                    runtime["active"] = runtime["isActive"]
+        temp_bucket = zones_state.get("temperatureControl") or {}
+        for runtime in temp_bucket.values():
+            if isinstance(runtime, dict):
+                if "setpoint" in runtime and "setPoint" not in runtime:
+                    runtime["setPoint"] = runtime["setpoint"]
+                elif "setPoint" in runtime and "setpoint" not in runtime:
+                    runtime["setpoint"] = runtime["setPoint"]
