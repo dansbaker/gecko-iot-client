@@ -7,7 +7,7 @@ before logging success, and correctly handles timeout/failure scenarios.
 
 import unittest
 from concurrent.futures import Future
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 from src.gecko_iot_client import GeckoIotClient
 from src.gecko_iot_client.models.zone_types import ZoneType
