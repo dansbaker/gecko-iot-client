@@ -592,12 +592,25 @@ class MqttTransporter(AbstractTransporter):
         if self._monitor_stop_event.is_set():
             return
         self._monitor_stop_event.wait(delay)
-        if not self._monitor_stop_event.is_set():
-            logger.info(
-                "Retrying token refresh (attempt %d)...",
-                failure_count + 1,
-            )
-            self._handle_token_refresh()
+        if self._monitor_stop_event.is_set():
+            return
+
+        # Cap total consecutive failures to prevent infinite retry chains
+        # when network is completely unavailable
+        with self._state_lock:
+            if self._consecutive_refresh_failures >= 10:
+                logger.warning(
+                    "Token refresh failed %d consecutive times, giving up. "
+                    "Will resume on next successful connection.",
+                    self._consecutive_refresh_failures,
+                )
+                return
+
+        logger.info(
+            "Retrying token refresh (attempt %d)...",
+            failure_count + 1,
+        )
+        self._handle_token_refresh()
 
     def _schedule_token_refresh_then_reconnect(self) -> None:
         """Refresh the token immediately and reconnect with the fresh URL.
@@ -606,6 +619,16 @@ class MqttTransporter(AbstractTransporter):
         Instead of reconnecting with a stale URL (which will just fail repeatedly),
         this refreshes the token first so the reconnection uses a valid broker URL.
         """
+        # Guard against concurrent calls (e.g., rapid disconnect events)
+        with self._state_lock:
+            if self._is_refreshing_token or self._is_reconnecting:
+                logger.debug(
+                    "Skipping token-refresh-then-reconnect: already refreshing=%s, reconnecting=%s",
+                    self._is_refreshing_token,
+                    self._is_reconnecting,
+                )
+                return
+
         refresh_thread = threading.Thread(
             target=self._do_token_refresh_then_reconnect,
             daemon=True,
@@ -678,9 +701,20 @@ class MqttTransporter(AbstractTransporter):
     def _delayed_cooldown_refresh(self) -> None:
         """Wait for cooldown period then force a token refresh (runs in background)."""
         self._monitor_stop_event.wait(300)  # Interruptible 5 minute cooldown
-        if not self._monitor_stop_event.is_set():
-            logger.info("Cooldown period ended, forcing token refresh")
-            self._handle_token_refresh()
+        if self._monitor_stop_event.is_set():
+            return
+
+        # Respect the failure cap — don't keep retrying forever
+        with self._state_lock:
+            if self._consecutive_refresh_failures >= 10:
+                logger.warning(
+                    "Cooldown refresh skipped: %d consecutive failures, giving up.",
+                    self._consecutive_refresh_failures,
+                )
+                return
+
+        logger.info("Cooldown period ended, forcing token refresh")
+        self._handle_token_refresh()
 
     def _delayed_reconnect(self, delay: float, attempt_num: int) -> None:
         """Execute a delayed reconnection attempt (runs in background thread)."""
@@ -720,6 +754,10 @@ class MqttTransporter(AbstractTransporter):
     def _handle_connection_established(self) -> None:
         """Handle successful MQTT connection event."""
         self._reconnection_handler.on_success()
+
+        # Reset failure counter so refresh retries resume after a network recovery
+        with self._state_lock:
+            self._consecutive_refresh_failures = 0
 
         # Schedule subscription setup in background to avoid blocking lifecycle callback
         setup_thread = threading.Thread(
