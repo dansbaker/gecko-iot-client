@@ -1,9 +1,12 @@
 [project]
-name = "gecko-iot-client"
-dynamic = ["version"]
-description = "A Python client library for Gecko IoT devices with AWS IoT integration"
+name = "gecko-iot-client-community"
+version = "0.3.0"
+description = "Community fork of the Gecko IoT client with fixes & extensions for the Home Assistant integration"
 authors = [
     {name = "alex-reid-gecko", email = "areid@geckoal.com"}
+]
+maintainers = [
+    {name = "Dan Baker", email = "dansbaker@users.noreply.github.com"}
 ]
 readme = "README.md"
 license = "GPL-3.0-or-later"
@@ -25,10 +28,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/geckoal/gecko-iot-client"
-Documentation = "https://geckoal.github.io/gecko-iot-client/"
-Repository = "https://github.com/geckoal/gecko-iot-client.git"
-Issues = "https://github.com/geckoal/gecko-iot-client/issues"
+Homepage = "https://github.com/dansbaker/gecko-iot-client"
+Repository = "https://github.com/dansbaker/gecko-iot-client.git"
+Issues = "https://github.com/dansbaker/gecko-iot-client/issues"
+Upstream = "https://github.com/geckoal/gecko-iot-client"
 
 [project.optional-dependencies]
 docs = [
@@ -57,11 +60,8 @@ gecko-build-docs = "gecko_iot_client.docs:build_docs"
 gecko-build-changelog = "gecko_iot_client.changelog:build_changelog"
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel", "setuptools-scm>=8.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools_scm]
-root = ".."
 
 [tool.setuptools.packages.find]
 where = ["src"]
